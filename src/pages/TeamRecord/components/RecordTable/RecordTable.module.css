@@ -6,6 +6,11 @@
   box-shadow: 0 24px 60px var(--color-black-26);
 }
 
+.virtualTableShell {
+  max-height: var(--record-table-max-height, 912px);
+  overflow: auto;
+}
+
 .table {
   width: max-content;
   min-width: 100%;
@@ -23,6 +28,12 @@
   white-space: nowrap;
   border-bottom: 1px solid var(--color-white-10);
   background: var(--color-white-02);
+}
+
+.virtualTableShell .headerCell {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .bodyCell {
@@ -45,6 +56,12 @@
 
 .row:hover .bodyCell {
   background: var(--color-accent-08);
+}
+
+.spacerCell {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .alignCenter {

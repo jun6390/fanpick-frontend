@@ -17,6 +17,8 @@ const TeamIndicator = ({ team }) => {
       src={team.logo}
       alt=""
       aria-hidden="true"
+      loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

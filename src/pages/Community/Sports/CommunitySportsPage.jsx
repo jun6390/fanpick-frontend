@@ -15,6 +15,7 @@ import {
   markPredictedMatches,
 } from "../../../services/predictionApi";
 import { fetchTeamStandings } from "../../../services/teamStandings";
+import { addDays, formatDateKey } from "../../../utils/date";
 import { normalizeMatchTimingStatus } from "../../../utils/matchStatus";
 import CommunitySubNav from "../components/CommunitySubNav/CommunitySubNav";
 import styles from "./CommunitySportsPage.module.css";
@@ -81,21 +82,6 @@ const STANDING_SKELETON_ROWS = {
   kbo: 10,
   kleague: 12,
   lck: 10,
-};
-const padNumber = (number) => String(number).padStart(2, "0");
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
-
-const addDays = (date, amount) => {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + amount);
-  return nextDate;
 };
 
 const formatShortDate = (dateKey) => {
@@ -297,7 +283,9 @@ const CommunitySportsPage = ({ view = "standings" }) => {
         const recentMatches = await fetchRecentResultMatches();
 
         if (view === "prediction-results") {
-          const predictionStats = await fetchMatchPredictionStats();
+          const predictionStats = await fetchMatchPredictionStats(
+            recentMatches.map((match) => match.databaseId),
+          );
           const matchesWithStats = applyPredictionStatsToMatches(
             recentMatches,
             predictionStats,

@@ -1,21 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import {
   FiChevronLeft,
   FiChevronRight,
   FiChevronsLeft,
   FiChevronsRight,
 } from "react-icons/fi";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import SearchInput from "../../components/SearchInput/SearchInput";
 import Skeleton from "../../components/Skeleton/Skeleton";
 import useAuth from "../../contexts/useAuth";
 import useRelativeTimeClock from "../../hooks/useRelativeTimeClock";
-import {
-  fetchCommunityPosts,
-  fetchMyCommunityComments,
-} from "../../services/communityApi";
-import { subscribeToCommunityChanges } from "../../services/communityRealtime";
 import { formatRelativeTime } from "../../utils/formatRelativeTime";
 import {
   CommunityCategoryPanel,
@@ -24,6 +20,8 @@ import {
 import CommunitySubNav from "./components/CommunitySubNav/CommunitySubNav";
 import { BOARD_FILTERS, CATEGORIES } from "./communityConstants";
 import { getCommunityPostImages } from "./communityImageUtils";
+import useCommunityList from "./hooks/useCommunityList";
+import { queryClient } from "../../lib/queryClient";
 import styles from "./CommunityPage.module.css";
 
 const PAGE_SIZE = 10;
@@ -81,16 +79,12 @@ const CommunityPaginationSkeleton = () => (
   </div>
 );
 
-const CommunityPage = () => {
+const CommunityPageContent = () => {
   const { user } = useAuth();
   const userId = user?.id;
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [posts, setPosts] = useState([]);
-  const [myComments, setMyComments] = useState([]);
   const [sortBy, setSortBy] = useState("latest");
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
 
   const currentTime = useRelativeTimeClock();
   const contentStartRef = useRef(null);
@@ -109,85 +103,52 @@ const CommunityPage = () => {
   const currentPage =
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const loadPosts = useCallback(
-    async ({ showLoading = true } = {}) => {
-      try {
-        if (showLoading) {
-          setIsLoading(true);
-        }
-
-        setErrorMessage("");
-
-        const [postData, commentData] = await Promise.all([
-          fetchCommunityPosts(),
-          fetchMyCommunityComments(userId),
-        ]);
-
-        setPosts(postData);
-        setMyComments(commentData);
-      } catch (error) {
-        console.error("커뮤니티 게시글 조회 오류:", error);
-        setErrorMessage("게시글을 불러오지 못했습니다.");
-      } finally {
-        if (showLoading) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [userId],
-  );
-
-  useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      loadPosts();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timerId);
-    };
-  }, [loadPosts]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToCommunityChanges({
-      channelName: "community-post-list",
-      onChange: () => loadPosts({ showLoading: false }),
-    });
-
-    return unsubscribe;
-  }, [loadPosts]);
+  const {
+    errorMessage,
+    isLoading,
+    myComments,
+    popularPosts,
+    posts,
+    totalCount,
+  } = useCommunityList({
+    category,
+    currentPage,
+    pageSize: PAGE_SIZE,
+    searchKeyword,
+    sortBy,
+    userId,
+  });
 
   const selectedCategory = BOARD_FILTERS.find((item) => item.id === category);
 
   const filteredPosts = useMemo(() => {
     let nextPosts = [...posts];
 
-    if (category === "my-posts") {
-      nextPosts = posts.filter((post) => post.user_id === userId);
-    } else if (category === "my-comments") {
-      const postsById = new Map(posts.map((post) => [post.id, post]));
-
-      nextPosts = myComments
-        .map((comment) => {
-          const post = postsById.get(comment.post_id);
-
-          if (!post) {
-            return null;
-          }
-
-          return {
-            ...post,
-            id: `comment-${comment.id}`,
-            destinationId: post.id,
-            title: comment.content,
-            postTitle: post.title,
-            created_at: comment.created_at,
-            isMyComment: true,
-          };
-        })
-        .filter(Boolean);
-    } else if (category !== "all") {
-      nextPosts = posts.filter((post) => post.category === category);
+    if (category !== "my-comments") {
+      return nextPosts;
     }
+
+    const postsById = new Map(posts.map((post) => [post.id, post]));
+
+    nextPosts = myComments
+      .map((comment) => {
+        const post = postsById.get(comment.post_id);
+
+        if (!post) {
+          return null;
+        }
+
+        return {
+          ...post,
+          id: `comment-${comment.id}`,
+          destinationId: post.id,
+          title: comment.content,
+          postTitle: post.title,
+          created_at: comment.created_at,
+          isMyComment: true,
+        };
+      })
+      .filter(Boolean);
 
     if (normalizedKeyword) {
       nextPosts = nextPosts.filter((post) => {
@@ -211,24 +172,18 @@ const CommunityPage = () => {
 
       return new Date(b.created_at) - new Date(a.created_at);
     });
-  }, [category, myComments, normalizedKeyword, posts, sortBy, userId]);
+  }, [category, myComments, normalizedKeyword, posts, sortBy]);
 
-  const popularPosts = useMemo(
-    () =>
-      [...posts]
-        .sort((a, b) => (b.view_count ?? 0) - (a.view_count ?? 0))
-        .slice(0, 10),
-    [posts],
-  );
-
-  const pageCount = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+  const resultCount =
+    category === "my-comments" ? filteredPosts.length : totalCount;
+  const pageCount = Math.max(1, Math.ceil(resultCount / PAGE_SIZE));
 
   const activePage = Math.min(currentPage, pageCount);
 
-  const visiblePosts = filteredPosts.slice(
-    (activePage - 1) * PAGE_SIZE,
-    activePage * PAGE_SIZE,
-  );
+  const visiblePosts =
+    category === "my-comments"
+      ? filteredPosts.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
+      : filteredPosts;
 
   const visiblePageNumbers = getVisiblePageNumbers(activePage, pageCount);
 
@@ -418,7 +373,7 @@ const CommunityPage = () => {
                 filteredPosts.length > 0 && (
                   <p className={styles.searchResult} aria-live="polite">
                     <strong>{searchKeyword.trim()}</strong> 검색 결과{" "}
-                    <span>{filteredPosts.length}개</span>
+                    <span>{resultCount}개</span>
                   </p>
                 )}
 
@@ -505,7 +460,12 @@ const CommunityPage = () => {
                                   className={styles.postImagePreview}
                                   aria-label={`첨부 이미지 ${postImages.length}개`}
                                 >
-                                  <img src={postImages[0].url} alt="" />
+                                  <img
+                                    src={postImages[0].url}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
 
                                   {postImages.length > 1 && (
                                     <small>{postImages.length}</small>
@@ -609,5 +569,11 @@ const CommunityPage = () => {
     </>
   );
 };
+
+const CommunityPage = () => (
+  <QueryClientProvider client={queryClient}>
+    <CommunityPageContent />
+  </QueryClientProvider>
+);
 
 export default CommunityPage;

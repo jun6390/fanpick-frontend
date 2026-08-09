@@ -1,418 +1,49 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import Button from "../../components/Button/Button.jsx";
 import EmptyState from "../../components/EmptyState/EmptyState.jsx";
+import FanPickDialog from "../../components/FanPickDialog/FanPickDialog.jsx";
 import PaginationControls from "../../components/PaginationControls/PaginationControls.jsx";
 import PredictionBadgeIcon from "../../components/PredictionBadgeIcon/PredictionBadgeIcon.jsx";
-import Skeleton from "../../components/Skeleton/Skeleton.jsx";
-import { getTeamInfo } from "../../constants/teamInfo.js";
 import {
   FAVORITE_TEAMS_CHANGED_EVENT,
   fetchFavoriteTeamIds,
   getFavoriteTeamIds,
 } from "../../services/favoriteTeams.js";
+import useFanPickDialog from "../../hooks/useFanPickDialog.js";
 import { subscribeToMatchChanges } from "../../services/matchRealtime.js";
 import {
   createSettledPredictionSummary,
   fetchMatchPredictionStats,
   fetchMyPredictions,
-  hasResolvedPredictionScore,
-  resolvePredictionResult,
 } from "../../services/predictionApi.js";
 import { supabase } from "../../lib/supabase.js";
 import {
   getPredictionBadgeGuide,
   getPredictionBadgeMeta,
 } from "../../utils/predictionBadge.js";
-import {
-  canChangePredictionByBeginAt,
-  createMatchBeginAt,
-} from "../../utils/predictionDeadline.js";
 import { createPredictionPath } from "../../utils/predictionPath.js";
 import { getTeamsByIds, TEAM_LEAGUE_LABELS } from "../Teams/data/teams.js";
-import { RESULT_LABELS } from "../Prediction/predictionUtils.js";
+import FavoriteTeamLogo from "./components/FavoriteTeamLogo.jsx";
+import MyPageSkeleton from "./components/MyPageSkeleton.jsx";
+import {
+  ALLOWED_IMAGE_TYPES,
+  FAVORITE_TEAMS_PAGE_SIZE,
+  INITIAL_USER_INFO,
+  MAX_AVATAR_SIZE,
+  PICK_HISTORY_PAGE_SIZE,
+  PREDICTION_REFRESH_DEBOUNCE_MS,
+  PREDICTION_REFRESH_INTERVAL_MS,
+  createSportStatistics,
+  formatJoinedDate,
+  normalizePredictionHistory,
+} from "./myPageUtils.js";
 import styles from "./MyPage.module.css";
 
-const INITIAL_USER_INFO = {
-  id: "",
-  nickname: "",
-  email: "",
-  joinedAt: "",
-  avatarUrl: "",
-};
-
-const ALLOWED_IMAGE_TYPES = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
-const FAVORITE_TEAMS_PAGE_SIZE = 6;
-const PICK_HISTORY_PAGE_SIZE = 4;
-const PREDICTION_REFRESH_DEBOUNCE_MS = 500;
-const PREDICTION_REFRESH_INTERVAL_MS = 60_000;
-const PREDICTION_SPORTS = ["soccer", "baseball", "esports"];
-const PREDICTION_BADGE_CONTEXTS = ["overall", ...PREDICTION_SPORTS];
-const SPORT_LABELS = {
-  baseball: "BASEBALL",
-  esports: "LOL",
-  soccer: "SOCCER",
-};
-const EMPTY_PREDICTION_SUMMARY = {
-  total: 0,
-  correct: 0,
-  incorrect: 0,
-  accuracy: 0,
-};
-
-const MyPageSkeleton = () => (
-  <main className={styles.myPage}>
-    <div
-      className={`container ${styles.inner}`}
-      aria-label="마이페이지 로딩 중"
-    >
-      <header className={styles.pageHeader}>
-        <Skeleton.Line className={styles.skeletonEyebrow} />
-        <Skeleton.Line className={styles.skeletonPageTitle} />
-        <Skeleton.Line className={styles.skeletonPageDescription} />
-      </header>
-
-      <section className={styles.profileSection}>
-        <div className={styles.profileMain}>
-          <Skeleton.Circle className={styles.skeletonProfileAvatar} />
-
-          <div className={styles.profileInfo}>
-            <Skeleton.Line className={styles.skeletonNickname} />
-            <Skeleton.Line className={styles.skeletonEmail} />
-            <Skeleton.Line className={styles.skeletonJoinedAt} />
-          </div>
-        </div>
-
-        <div className={styles.profileBadges}>
-          {PREDICTION_BADGE_CONTEXTS.map((sport) => (
-            <article
-              key={sport}
-              className={`${styles.profileBadge} ${styles.skeletonStaticCard}`}
-            >
-              <Skeleton.Circle className={styles.skeletonBadgeIcon} />
-
-              <div className={styles.skeletonBadgeInfo}>
-                <Skeleton.Line className={styles.skeletonBadgeSport} />
-                <Skeleton.Line className={styles.skeletonBadgeTitle} />
-                <Skeleton.Line className={styles.skeletonBadgeText} />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.badgeGuideSection}>
-        <div className={styles.sectionHeader}>
-          <Skeleton.Line className={styles.skeletonSectionTitle} />
-          <Skeleton.Line className={styles.skeletonSectionDescription} />
-        </div>
-
-        <div className={styles.badgeGuideGrid}>
-          {PREDICTION_BADGE_CONTEXTS.map((sport) => (
-            <article
-              key={sport}
-              className={`${styles.badgeGuideCard} ${styles.skeletonStaticCard}`}
-            >
-              <div className={styles.skeletonBadgeGuideHeader}>
-                <Skeleton.Circle className={styles.skeletonBadgeIcon} />
-
-                <div className={styles.skeletonBadgeInfo}>
-                  <Skeleton.Line className={styles.skeletonBadgeSport} />
-                  <Skeleton.Line className={styles.skeletonBadgeTitle} />
-                </div>
-              </div>
-
-              <div className={styles.skeletonBadgeGuideList}>
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton.Line
-                    key={`${sport}-${index}`}
-                    className={styles.skeletonBadgeGuideItem}
-                  />
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.statisticsSection}>
-        <div className={styles.sectionHeader}>
-          <Skeleton.Line className={styles.skeletonSectionTitle} />
-          <Skeleton.Line className={styles.skeletonSectionDescription} />
-        </div>
-
-        <div className={styles.statisticsGrid}>
-          {Array.from({ length: 4 }, (_, index) => (
-            <article
-              key={index}
-              className={`${styles.statisticCard} ${styles.skeletonStaticCard}`}
-            >
-              <Skeleton.Line className={styles.skeletonStatLabel} />
-              <Skeleton.Line className={styles.skeletonStatValue} />
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.favoriteTeamsSection}>
-        <div className={styles.sectionHeaderWithNavigation}>
-          <div className={styles.sectionHeader}>
-            <Skeleton.Line className={styles.skeletonSectionTitle} />
-            <Skeleton.Line className={styles.skeletonSectionDescription} />
-          </div>
-
-          <div className={styles.skeletonSectionNavigation}>
-            <Skeleton.Line className={styles.skeletonPageCount} />
-            <Skeleton.Circle className={styles.skeletonNavigationButton} />
-            <Skeleton.Circle className={styles.skeletonNavigationButton} />
-          </div>
-        </div>
-
-        <div className={styles.favoriteTeamsGrid}>
-          {Array.from({ length: FAVORITE_TEAMS_PAGE_SIZE }, (_, index) => (
-            <article
-              key={index}
-              className={`${styles.favoriteTeamCard} ${styles.skeletonStaticCard}`}
-            >
-              <Skeleton.Box className={styles.skeletonFavoriteLogoBox} />
-
-              <div className={styles.favoriteTeamInfo}>
-                <Skeleton.Line className={styles.skeletonFavoriteLeague} />
-                <Skeleton.Line className={styles.skeletonFavoriteName} />
-                <Skeleton.Line className={styles.skeletonFavoriteTone} />
-                <Skeleton.Line className={styles.skeletonFavoriteToneShort} />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.historySection}>
-        <div className={styles.sectionHeaderWithNavigation}>
-          <div className={styles.sectionHeader}>
-            <Skeleton.Line className={styles.skeletonSectionTitle} />
-            <Skeleton.Line className={styles.skeletonSectionDescription} />
-          </div>
-
-          <div className={styles.skeletonSectionNavigation}>
-            <Skeleton.Line className={styles.skeletonPageCount} />
-            <Skeleton.Circle className={styles.skeletonNavigationButton} />
-            <Skeleton.Circle className={styles.skeletonNavigationButton} />
-          </div>
-        </div>
-
-        <div className={styles.historyList}>
-          {Array.from({ length: PICK_HISTORY_PAGE_SIZE }, (_, index) => (
-            <article
-              key={index}
-              className={`${styles.historyCard} ${styles.skeletonStaticCard}`}
-            >
-              <div className={styles.historyMeta}>
-                <Skeleton.Line className={styles.skeletonHistoryMeta} />
-                <Skeleton.Line className={styles.skeletonHistoryResult} />
-              </div>
-
-              <div className={styles.historyDate}>
-                <Skeleton.Line className={styles.skeletonHistoryDate} />
-                <Skeleton.Line className={styles.skeletonHistoryTime} />
-              </div>
-
-              <div className={styles.historyTeams}>
-                <Skeleton.Line className={styles.skeletonHistoryTeam} />
-                <Skeleton.Line className={styles.skeletonHistoryScore} />
-                <Skeleton.Line className={styles.skeletonHistoryTeam} />
-              </div>
-
-              <div className={styles.historyPrediction}>
-                <div className={styles.historyPredictionLabels}>
-                  <Skeleton.Line className={styles.skeletonPredictionLabel} />
-                  <Skeleton.Line className={styles.skeletonPredictionLabel} />
-                </div>
-
-                <Skeleton.Line className={styles.skeletonPredictionBar} />
-              </div>
-
-              <div className={styles.historyFooter}>
-                <Skeleton.Line className={styles.skeletonHistoryPick} />
-                <Skeleton.Line className={styles.skeletonHistoryButton} />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  </main>
-);
-
-const formatJoinedDate = (date) => {
-  if (!date) return "-";
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(new Date(date));
-};
-
-const normalizeTeamCode = (teamCode) => teamCode?.trim().toUpperCase() || "";
-
-const parseScore = (score) => {
-  if (!score) {
-    return {
-      awayScore: null,
-      homeScore: null,
-    };
-  }
-
-  const [awayScore, homeScore] = score.split(":").map(Number);
-
-  return {
-    awayScore: Number.isFinite(awayScore) ? awayScore : null,
-    homeScore: Number.isFinite(homeScore) ? homeScore : null,
-  };
-};
-
-const formatMatchDate = (dateKey) => {
-  if (!dateKey) {
-    return "날짜 미정";
-  }
-
-  const [, month, day] = dateKey.split("-");
-
-  return `${month}.${day}`;
-};
-
-const createFallbackSportSummaries = (predictions) =>
-  Object.fromEntries(
-    PREDICTION_SPORTS.map((sport) => {
-      const sportPredictions = predictions.filter(
-        (prediction) => prediction.matches?.sport === sport,
-      );
-
-      return [sport, createSettledPredictionSummary(sportPredictions)];
-    }),
-  );
-
-const createSportStatistics = (predictions) => {
-  const fallbackSummaries = createFallbackSportSummaries(predictions);
-
-  return PREDICTION_SPORTS.map((sport) => {
-    const fallbackStats = fallbackSummaries[sport] ?? EMPTY_PREDICTION_SUMMARY;
-
-    return {
-      sport,
-      total: fallbackStats.total,
-      correct: fallbackStats.correct,
-      accuracy: fallbackStats.accuracy,
-    };
-  });
-};
-
-const getPredictionRates = (predictionStats, matchId) => {
-  const matchStats = predictionStats.find(
-    (stat) => String(stat.match_id) === String(matchId),
-  );
-
-  return {
-    awayRate: Number(matchStats?.away_rate ?? 50),
-    homeRate: Number(matchStats?.home_rate ?? 50),
-    participants: Number(matchStats?.participant_count ?? 0),
-  };
-};
-
-const normalizePredictionHistory = (
-  predictions,
-  predictionStats,
-  currentTime,
-) =>
-  predictions
-    .map((prediction) => {
-      const match = prediction.matches;
-
-      if (!match) {
-        return null;
-      }
-
-      const sport = match.sport;
-      const homeTeamCode = normalizeTeamCode(match.home_team_code);
-      const awayTeamCode = normalizeTeamCode(match.away_team_code);
-      const selectedTeamCode = normalizeTeamCode(prediction.selected_team_code);
-      const selectedSide =
-        selectedTeamCode === homeTeamCode
-          ? "home"
-          : selectedTeamCode === awayTeamCode
-            ? "away"
-            : "";
-      const homeTeam = getTeamInfo(homeTeamCode, sport);
-      const awayTeam = getTeamInfo(awayTeamCode, sport);
-      const selectedTeam =
-        selectedSide === "home"
-          ? homeTeam
-          : selectedSide === "away"
-            ? awayTeam
-            : getTeamInfo(selectedTeamCode, sport);
-      const { awayScore, homeScore } = parseScore(match.score);
-      const resolvedResult = resolvePredictionResult(prediction);
-      const hasScore =
-        (["live", "finished"].includes(match.status) ||
-          hasResolvedPredictionScore(match)) &&
-        homeScore !== null &&
-        awayScore !== null;
-      const matchTime = match.match_time?.slice(0, 5) ?? "미정";
-      const beginAt = createMatchBeginAt(match.match_date, matchTime);
-      const rates = getPredictionRates(predictionStats, prediction.match_id);
-
-      return {
-        id: `${prediction.match_id}-${selectedTeamCode}`,
-        matchId: prediction.match_id,
-        dateLabel: formatMatchDate(match.match_date),
-        time: matchTime,
-        sportLabel: SPORT_LABELS[sport] ?? sport?.toUpperCase() ?? "",
-        league: match.league ?? "",
-        result: resolvedResult,
-        resultLabel: RESULT_LABELS[resolvedResult] ?? "예측진행중",
-        selectedSide,
-        selectedTeam,
-        homeTeam,
-        awayTeam,
-        beginAt,
-        canChange:
-          match.status === "scheduled" &&
-          canChangePredictionByBeginAt(beginAt, currentTime),
-        ...rates,
-        scoreText: hasScore ? `${homeScore} : ${awayScore}` : "VS",
-        status: match.status,
-      };
-    })
+const getPredictionMatchIds = (predictionRows = []) =>
+  predictionRows
+    .map((prediction) => prediction.match_id ?? prediction.matches?.id)
     .filter(Boolean);
-
-const FavoriteTeamLogo = ({ team }) => {
-  const [hasError, setHasError] = useState(false);
-
-  if (!team.logo || hasError) {
-    return (
-      <div className={styles.favoriteTeamLogoFallback} aria-hidden="true">
-        {team.shortName}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      className={styles.favoriteTeamLogo}
-      src={team.logo}
-      alt={`${team.name} 로고`}
-      loading="lazy"
-      onError={() => setHasError(true)}
-    />
-  );
-};
 
 const MyPage = () => {
   const navigate = useNavigate();
@@ -427,6 +58,9 @@ const MyPage = () => {
   const [favoriteTeamsPage, setFavoriteTeamsPage] = useState(0);
   const [historyPage, setHistoryPage] = useState(0);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const { dialogProps, showDialog } = useFanPickDialog({
+    lockBodyScroll: false,
+  });
 
   const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [nicknameInput, setNicknameInput] = useState("");
@@ -473,19 +107,20 @@ const MyPage = () => {
         };
         let nextPredictionError = "";
 
-        const [nextFavoriteTeamIds, nextPredictionRecords, nextPredictionStats] =
-          await Promise.all([
-            fetchFavoriteTeamIds(user.id),
-            fetchMyPredictions(user.id).catch((error) => {
-              console.error("예측 기록 조회 오류:", error);
-              nextPredictionError = "승부예측 정보를 불러오지 못했습니다.";
-              return [];
-            }),
-            fetchMatchPredictionStats().catch((error) => {
-              console.error("예측률 조회 오류:", error);
-              return [];
-            }),
-          ]);
+        const [nextFavoriteTeamIds, nextPredictionRecords] = await Promise.all([
+          fetchFavoriteTeamIds(user.id),
+          fetchMyPredictions(user.id).catch((error) => {
+            console.error("예측 기록 조회 오류:", error);
+            nextPredictionError = "승부예측 정보를 불러오지 못했습니다.";
+            return [];
+          }),
+        ]);
+        const nextPredictionStats = await fetchMatchPredictionStats(
+          getPredictionMatchIds(nextPredictionRecords),
+        ).catch((error) => {
+          console.error("예측률 조회 오류:", error);
+          return [];
+        });
 
         if (!isMounted) {
           return;
@@ -584,10 +219,10 @@ const MyPage = () => {
 
     const refreshPredictionData = async () => {
       try {
-        const [nextPredictionRecords, nextPredictionStats] = await Promise.all([
-          fetchMyPredictions(userInfo.id),
-          fetchMatchPredictionStats(),
-        ]);
+        const nextPredictionRecords = await fetchMyPredictions(userInfo.id);
+        const nextPredictionStats = await fetchMatchPredictionStats(
+          getPredictionMatchIds(nextPredictionRecords),
+        );
 
         if (!isMounted) {
           return;
@@ -672,12 +307,18 @@ const MyPage = () => {
     const trimmedNickname = nicknameInput.trim();
 
     if (!trimmedNickname) {
-      alert("닉네임을 입력해 주세요.");
+      showDialog({
+        description: "닉네임을 입력해 주세요.",
+        title: "닉네임 확인",
+      });
       return;
     }
 
     if (trimmedNickname.length > 12) {
-      alert("닉네임은 12자 이하로 입력해 주세요.");
+      showDialog({
+        description: "닉네임은 12자 이하로 입력해 주세요.",
+        title: "닉네임 확인",
+      });
       return;
     }
 
@@ -725,7 +366,10 @@ const MyPage = () => {
       setIsEditingNickname(false);
     } catch (error) {
       console.error("닉네임 수정 오류:", error);
-      alert("닉네임을 수정하지 못했습니다.");
+      showDialog({
+        description: "닉네임을 수정하지 못했습니다.",
+        title: "닉네임 수정 실패",
+      });
     } finally {
       setIsSavingNickname(false);
     }
@@ -754,12 +398,18 @@ const MyPage = () => {
     const extension = ALLOWED_IMAGE_TYPES[file.type];
 
     if (!extension) {
-      alert("JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.");
+      showDialog({
+        description: "JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.",
+        title: "지원하지 않는 파일 형식",
+      });
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      alert("프로필 이미지는 2MB 이하만 업로드할 수 있습니다.");
+      showDialog({
+        description: "프로필 이미지는 2MB 이하만 업로드할 수 있습니다.",
+        title: "이미지 용량 초과",
+      });
       return;
     }
 
@@ -837,7 +487,10 @@ const MyPage = () => {
       }));
     } catch (error) {
       console.error("프로필 이미지 업로드 오류:", error);
-      alert("프로필 이미지를 변경하지 못했습니다.");
+      showDialog({
+        description: "프로필 이미지를 변경하지 못했습니다.",
+        title: "프로필 이미지 변경 실패",
+      });
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -961,7 +614,8 @@ const MyPage = () => {
   };
 
   return (
-    <main className={styles.myPage}>
+    <>
+      <main className={styles.myPage}>
       <div className={`container ${styles.inner}`}>
         <header className={styles.pageHeader}>
           <p className={styles.eyebrow}>FANPICK ACCOUNT</p>
@@ -988,6 +642,8 @@ const MyPage = () => {
                     src={userInfo.avatarUrl}
                     alt={`${userInfo.nickname} 프로필`}
                     className={styles.profileAvatarImage}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <span aria-hidden="true">{profileInitial}</span>
@@ -1429,7 +1085,10 @@ const MyPage = () => {
           )}
         </section>
       </div>
-    </main>
+      </main>
+
+      <FanPickDialog {...dialogProps} />
+    </>
   );
 };
 

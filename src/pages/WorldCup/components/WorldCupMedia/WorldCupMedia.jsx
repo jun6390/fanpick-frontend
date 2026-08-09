@@ -63,6 +63,7 @@ const WorldCupMedia = ({
       alt={alt}
       draggable={draggable}
       loading={loading}
+      decoding="async"
       onError={() => setFailedSrc(src)}
     />
   );

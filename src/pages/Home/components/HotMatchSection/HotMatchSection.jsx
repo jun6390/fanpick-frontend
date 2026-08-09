@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import Button from "../../../../components/Button/Button";
 import EmptyState from "../../../../components/EmptyState/EmptyState";
 import FanPickDialog from "../../../../components/FanPickDialog/FanPickDialog";
@@ -18,6 +18,7 @@ import {
   createPredictionLocation,
   createPredictionPath,
 } from "../../../../utils/predictionPath";
+import { formatDateKey } from "../../../../utils/date";
 import { createMatchDateTime, isFutureMatch } from "../../../../utils/matchStatus";
 import styles from "./HotMatchSection.module.css";
 
@@ -27,17 +28,8 @@ const FILTERS = [
   { id: "esports", label: "LOL" },
 ];
 
-const padNumber = (number) => String(number).padStart(2, "0");
 const normalizeTeamCode = (teamCode) => teamCode?.trim().toUpperCase() ?? "";
 const HOT_MATCH_REFRESH_DEBOUNCE_MS = 500;
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
 
 const formatMatchDate = (dateKey) => {
   if (!dateKey) return "미정";
@@ -93,7 +85,7 @@ const normalizeHotMatch = (match, predictionStats) => ({
   awayRate: predictionStats?.awayRate ?? 50,
 });
 
-const fetchHotMatch = async (sport, now, predictionStatsByMatchId) => {
+const fetchHotMatch = async (sport, now) => {
   const todayKey = formatDateKey(now);
 
   const { data, error } = await supabase
@@ -127,19 +119,16 @@ const fetchHotMatch = async (sport, now, predictionStatsByMatchId) => {
     throw error;
   }
 
-  const hotMatchCandidate = (data ?? [])
+  const hotMatchCandidates = (data ?? [])
     .map((match) => {
       const matchDateTime = createMatchDateTime(
         match.match_date,
         match.match_time,
       );
-      const stats = predictionStatsByMatchId.get(String(match.id));
 
       return {
         match,
         matchDateTime,
-        participants: stats?.participants ?? 0,
-        stats,
       };
     })
     .filter(
@@ -154,7 +143,23 @@ const fetchHotMatch = async (sport, now, predictionStatsByMatchId) => {
           },
           now.getTime(),
         ),
-    )
+    );
+  const predictionStatsByMatchId = createPredictionStatsByMatchId(
+    await fetchMatchPredictionStats(
+      hotMatchCandidates.map(({ match }) => match.id),
+    ),
+  );
+
+  const hotMatchCandidate = hotMatchCandidates
+    .map((candidate) => {
+      const stats = predictionStatsByMatchId.get(String(candidate.match.id));
+
+      return {
+        ...candidate,
+        participants: stats?.participants ?? 0,
+        stats,
+      };
+    })
     .sort(
       (current, next) =>
         next.participants - current.participants ||
@@ -246,17 +251,10 @@ const HotMatchSection = () => {
         }
 
         const now = new Date();
-        const predictionStatsByMatchId = createPredictionStatsByMatchId(
-          await fetchMatchPredictionStats(),
-        );
 
         const results = await Promise.all(
           FILTERS.map(async ({ id }) => {
-            const match = await fetchHotMatch(
-              id,
-              now,
-              predictionStatsByMatchId,
-            );
+            const match = await fetchHotMatch(id, now);
 
             return [id, match];
           }),
@@ -444,6 +442,8 @@ const HotMatchSection = () => {
                         <img
                           src={hotMatch.homeTeam.logo}
                           alt={`${hotMatch.homeTeam.name} 로고`}
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <span>{hotMatch.homeTeam.shortName}</span>
@@ -495,6 +495,8 @@ const HotMatchSection = () => {
                         <img
                           src={hotMatch.awayTeam.logo}
                           alt={`${hotMatch.awayTeam.name} 로고`}
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <span>{hotMatch.awayTeam.shortName}</span>

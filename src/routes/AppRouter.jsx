@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router";
 import MainLayout from "../layouts/MainLayout/MainLayout";
 
 import ProtectedRoute from "./ProtectedRoute";
+import RouteFallback from "./RouteFallback";
 import ScrollToTop from "./ScrollToTop";
 
 const HomePage = lazy(() => import("../pages/Home/HomePage"));
@@ -48,7 +49,7 @@ const AppRouter = () => {
     <BrowserRouter>
       <ScrollToTop />
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route element={<MainLayout />}>
             {/* 누구나 접근 가능 */}

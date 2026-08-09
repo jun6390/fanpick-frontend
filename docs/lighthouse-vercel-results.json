@@ -1,0 +1,135 @@
+{
+  "measuredAt": "2026-08-09T11:52:42.292Z",
+  "environment": "Vercel generated production URL, Lighthouse 13.4.1, desktop preset",
+  "urls": {
+    "before": "https://fanpick-frontend-41mhvp309-hae-jun-s-projects.vercel.app",
+    "after": "https://fanpick-frontend-nngsavgvv-hae-jun-s-projects.vercel.app"
+  },
+  "raw": {
+    "before-home": {
+      "name": "before-home",
+      "finalUrl": "https://fanpick-frontend-41mhvp309-hae-jun-s-projects.vercel.app/",
+      "fetchTime": "2026-08-09T11:49:59.448Z",
+      "score": 95,
+      "fcpMs": 838.9540000000002,
+      "lcpMs": 1244.5740000000003,
+      "tbtMs": 5,
+      "cls": 0.00007397071091035771,
+      "speedIndexMs": 1393.7546098339626
+    },
+    "after-home": {
+      "name": "after-home",
+      "finalUrl": "https://fanpick-frontend-nngsavgvv-hae-jun-s-projects.vercel.app/",
+      "fetchTime": "2026-08-09T11:50:26.052Z",
+      "score": 93,
+      "fcpMs": 1048.2034999999998,
+      "lcpMs": 1296.7775299999998,
+      "tbtMs": 43.000000000000114,
+      "cls": 0.00007397071091035771,
+      "speedIndexMs": 1669.2914027759557
+    },
+    "before-team-record": {
+      "name": "before-team-record",
+      "finalUrl": "https://fanpick-frontend-41mhvp309-hae-jun-s-projects.vercel.app/team-record",
+      "fetchTime": "2026-08-09T11:50:49.723Z",
+      "score": 94,
+      "fcpMs": 837.6005,
+      "lcpMs": 1479.013,
+      "tbtMs": 0,
+      "cls": 0.004054884457515535,
+      "speedIndexMs": 1182.07758429962
+    },
+    "after-team-record": {
+      "name": "after-team-record",
+      "finalUrl": "https://fanpick-frontend-nngsavgvv-hae-jun-s-projects.vercel.app/team-record",
+      "fetchTime": "2026-08-09T11:51:12.959Z",
+      "score": 98,
+      "fcpMs": 837.1399999999999,
+      "lcpMs": 919.7690000000001,
+      "tbtMs": 56.21550000000008,
+      "cls": 0.006411063665378254,
+      "speedIndexMs": 1197.174774029802
+    },
+    "before-community": {
+      "name": "before-community",
+      "finalUrl": "https://fanpick-frontend-41mhvp309-hae-jun-s-projects.vercel.app/community",
+      "fetchTime": "2026-08-09T11:51:37.110Z",
+      "score": 90,
+      "fcpMs": 834.744,
+      "lcpMs": 1872.5730000000003,
+      "tbtMs": 0,
+      "cls": 0.0005864068432053768,
+      "speedIndexMs": 1293.1227378688943
+    },
+    "after-community": {
+      "name": "after-community",
+      "finalUrl": "https://fanpick-frontend-nngsavgvv-hae-jun-s-projects.vercel.app/community",
+      "fetchTime": "2026-08-09T11:52:01.564Z",
+      "score": 94,
+      "fcpMs": 827.852,
+      "lcpMs": 1163.8980000000001,
+      "tbtMs": 130.34449999999993,
+      "cls": 0.0005864068432053768,
+      "speedIndexMs": 1213.61358910117
+    }
+  },
+  "comparisons": {
+    "home": {
+      "beforeScore": 95,
+      "afterScore": 93,
+      "scoreDelta": -2,
+      "beforeFcpMs": 839,
+      "afterFcpMs": 1048,
+      "fcpReductionPct": -24.9,
+      "beforeLcpMs": 1245,
+      "afterLcpMs": 1297,
+      "lcpReductionPct": -4.2,
+      "beforeTbtMs": 5,
+      "afterTbtMs": 43,
+      "tbtReductionPct": -760,
+      "beforeCls": 0,
+      "afterCls": 0,
+      "beforeSpeedIndexMs": 1394,
+      "afterSpeedIndexMs": 1669,
+      "speedIndexReductionPct": -19.8
+    },
+    "teamRecord": {
+      "beforeScore": 94,
+      "afterScore": 98,
+      "scoreDelta": 4,
+      "beforeFcpMs": 838,
+      "afterFcpMs": 837,
+      "fcpReductionPct": 0.1,
+      "beforeLcpMs": 1479,
+      "afterLcpMs": 920,
+      "lcpReductionPct": 37.8,
+      "beforeTbtMs": 0,
+      "afterTbtMs": 56,
+      "tbtReductionPct": null,
+      "beforeCls": 0.004,
+      "afterCls": 0.006,
+      "beforeSpeedIndexMs": 1182,
+      "afterSpeedIndexMs": 1197,
+      "speedIndexReductionPct": -1.3
+    },
+    "community": {
+      "beforeScore": 90,
+      "afterScore": 94,
+      "scoreDelta": 4,
+      "beforeFcpMs": 835,
+      "afterFcpMs": 828,
+      "fcpReductionPct": 0.8,
+      "beforeLcpMs": 1873,
+      "afterLcpMs": 1164,
+      "lcpReductionPct": 37.8,
+      "beforeTbtMs": 0,
+      "afterTbtMs": 130,
+      "tbtReductionPct": null,
+      "beforeCls": 0.001,
+      "afterCls": 0.001,
+      "beforeSpeedIndexMs": 1293,
+      "afterSpeedIndexMs": 1214,
+      "speedIndexReductionPct": 6.1
+    }
+  }
+}

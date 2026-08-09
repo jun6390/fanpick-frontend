@@ -53,6 +53,8 @@ const CalendarFilter = ({
                       src={team.logo}
                       alt=""
                       aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : null}
                   <span className={css.teamFilterChipLabel}>

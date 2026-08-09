@@ -20,7 +20,24 @@ import {
   getDefaultMatchReminderSettings,
 } from "../../services/notificationPreferences";
 import { ensurePushSubscription } from "../../services/pushNotifications";
-import { getTeamsByIds, TEAM_BY_ID } from "../Teams/data/teams";
+import { getTeamsByIds } from "../Teams/data/teams";
+import {
+  CALENDAR_SKELETON_DAYS,
+  SPORT_FILTERS,
+  SUPPORTED_SPORTS,
+  WEEKDAY_LABELS,
+  addTeamLogo,
+  formatDateKey,
+  formatSelectedDateLabel,
+  getFeaturedTeamMatchValues,
+  getMonthRange,
+  getUniqueTeams,
+  groupMatchesByDate,
+  isAlarmUnavailableMatch,
+  isExcludedCalendarTeam,
+  isMatchForTeamValues,
+  isMatchingTeam,
+} from "./calendarPageUtils";
 import CalendarFilter from "./components/CalendarFilter/CalendarFilter";
 import CalendarGrid from "./components/CalendarGrid.jsx";
 import CalendarHeader from "./components/CalendarHeader.jsx";
@@ -28,129 +45,6 @@ import CalendarItemCard from "./components/CalendarItemCard";
 import MatchAlarmModal from "./components/MatchAlarmModal/MatchAlarmModal";
 import { fetchCalendarSchedule } from "./api/getSportSchedule";
 import styles from "./CalendarPage.module.css";
-
-const SPORT_FILTERS = [
-  { id: "my", label: "MY" },
-  { id: "baseball", label: "BASEBALL" },
-  { id: "soccer", label: "SOCCER" },
-  { id: "lol", label: "LOL" },
-];
-
-const WEEKDAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-const CALENDAR_SKELETON_DAYS = Array.from({ length: 42 }, (_, index) => index);
-const SUPPORTED_SPORTS = new Set(["baseball", "soccer", "lol"]);
-const EXCLUDED_BASEBALL_TEAM_CODES = new Set(["NANUM", "DREAM"]);
-
-const getMonthRange = (date) => {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const fromDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month + 1, 0);
-  const toDate = `${lastDay.getFullYear()}-${String(
-    lastDay.getMonth() + 1,
-  ).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
-
-  return { fromDate, toDate };
-};
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
-const formatSelectedDateLabel = (dateKey) => {
-  const [year, month, day] = String(dateKey ?? "").split("-");
-
-  return year && month && day ? `${year}.${month}.${day}` : "날짜 미정";
-};
-
-const normalizeTeamValue = (value) =>
-  String(value ?? "")
-    .trim()
-    .toUpperCase();
-
-const getTeamValueCandidates = (team) =>
-  [team?.code, team?.shortName, team?.name, team?.alias]
-    .filter(Boolean)
-    .map(normalizeTeamValue);
-
-const getFeaturedTeamMatchValues = (team) =>
-  [
-    team?.id,
-    team?.name,
-    team?.shortName,
-    ...(Array.isArray(team?.matchCodes) ? team.matchCodes : []),
-  ]
-    .filter(Boolean)
-    .map(normalizeTeamValue);
-
-const isMatchForTeamValues = (match, teamValues) =>
-  [match.homeTeam, match.awayTeam].some((team) =>
-    getTeamValueCandidates(team).some((teamValue) => teamValues.has(teamValue)),
-  );
-
-const getUniqueTeams = (matches) => {
-  const teamMap = new Map();
-
-  matches.forEach((match) => {
-    [match.homeTeam, match.awayTeam].forEach((team) => {
-      if (!team?.code || teamMap.has(team.code)) {
-        return;
-      }
-
-      teamMap.set(team.code, team);
-    });
-  });
-
-  return Array.from(teamMap.values());
-};
-
-const isExcludedCalendarTeam = (team) => {
-  return EXCLUDED_BASEBALL_TEAM_CODES.has(normalizeTeamValue(team?.code));
-};
-
-const isMatchingTeam = (team, selectedTeamCode) => {
-  if (!team || selectedTeamCode === "all") {
-    return false;
-  }
-
-  const featuredTeam = TEAM_BY_ID.get(selectedTeamCode);
-  const targetValues = new Set(
-    featuredTeam
-      ? getFeaturedTeamMatchValues(featuredTeam)
-      : [normalizeTeamValue(selectedTeamCode)],
-  );
-
-  return getTeamValueCandidates(team).some((teamValue) =>
-    targetValues.has(teamValue),
-  );
-};
-
-const groupMatchesByDate = (matches) =>
-  matches.reduce((acc, match) => {
-    if (!acc[match.date]) {
-      acc[match.date] = [];
-    }
-
-    acc[match.date].push(match);
-    return acc;
-  }, {});
-
-const addTeamLogo = (team) => ({
-  ...team,
-  logo: team.logo || "",
-});
-
-const isAlarmUnavailableMatch = (match) => {
-  const status = String(match?.statusCode ?? match?.statusInfo ?? "")
-    .trim()
-    .toLowerCase();
-
-  return ["finished", "ended", "final", "ft", "canceled", "cancelled", "postponed"].includes(status);
-};
 
 const CalendarPage = () => {
   const { user, isAuthLoading } = useAuth();
@@ -542,24 +436,6 @@ const CalendarPage = () => {
     try {
       await ensurePushSubscription(userId);
 
-      console.log("[calendar-alarm] save attempt", {
-        userId,
-        matchId: selectedAlarmMatch.id,
-        matchDate: selectedAlarmMatch.date,
-        matchTime: selectedAlarmMatch.time,
-        matchTitle: [
-          selectedAlarmMatch.homeTeam?.shortName ||
-            selectedAlarmMatch.homeTeam?.name,
-          selectedAlarmMatch.awayTeam?.shortName ||
-            selectedAlarmMatch.awayTeam?.name,
-        ]
-          .filter(Boolean)
-          .join(" vs "),
-        sportLabel: selectedAlarmMatch.sportLabel,
-        league: selectedAlarmMatch.league,
-        alarmSettings,
-      });
-
       const savedAlarm = await saveCalendarMatchAlarm(userId, {
         matchId: selectedAlarmMatch.id,
         presetId: alarmSettings?.presetId ?? "60",
@@ -587,7 +463,6 @@ const CalendarPage = () => {
         );
       }
 
-      console.log("[calendar-alarm] save success", savedAlarm);
       setSaveNotice({
         type: "success",
         message: "알림이 저장됐어요.",
@@ -619,11 +494,6 @@ const CalendarPage = () => {
     }
 
     try {
-      console.log("[calendar-alarm] delete attempt", {
-        userId,
-        matchId: selectedAlarmMatch.id,
-      });
-
       const canceledAlarm = await cancelCalendarMatchAlarm(
         userId,
         selectedAlarmMatch.id,
@@ -637,7 +507,6 @@ const CalendarPage = () => {
         prevIds.filter((matchId) => matchId !== matchIdToRemove),
       );
 
-      console.log("[calendar-alarm] delete success", canceledAlarm);
       setSaveNotice({
         type: "success",
         message: "알림이 해제됐어요.",

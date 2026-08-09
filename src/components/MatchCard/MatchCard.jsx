@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import useAuth from "../../contexts/useAuth";
 import {
   createPredictionLocation,
@@ -35,6 +35,8 @@ const TeamLogo = ({ src, name, shortName }) => {
       className={styles.teamLogo}
       src={src}
       alt={`${name} 로고`}
+      loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

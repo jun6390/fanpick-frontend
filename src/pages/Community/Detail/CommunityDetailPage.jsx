@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FiEye, FiThumbsDown, FiThumbsUp } from "react-icons/fi";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { FiEye } from "react-icons/fi";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import Button from "../../../components/Button/Button";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import FanPickDialog from "../../../components/FanPickDialog/FanPickDialog";
 import LinkifiedText from "../../../components/LinkifiedText/LinkifiedText";
-import Skeleton from "../../../components/Skeleton/Skeleton";
 import useAuth from "../../../contexts/useAuth";
+import useFanPickDialog from "../../../hooks/useFanPickDialog";
 import useRelativeTimeClock from "../../../hooks/useRelativeTimeClock";
 import {
   createCommunityComment,
@@ -26,289 +26,24 @@ import {
 } from "../../../services/communityApi";
 import { subscribeToCommunityChanges } from "../../../services/communityRealtime";
 import { formatRelativeTime } from "../../../utils/formatRelativeTime";
-import { getPredictionBadgeMeta } from "../../../utils/predictionBadge";
 import CommunitySidebars from "../components/CommunitySidebars/CommunitySidebars";
-import { CATEGORIES } from "../communityConstants";
-import { getCommunityPostImages } from "../communityImageUtils";
+import {
+  CATEGORY_LABELS,
+  CATEGORY_SPORT,
+  EMPTY_REACTION,
+  countComments,
+  normalizeComments,
+  normalizePost,
+  submitFormOnEnter,
+  updateReactionSummary,
+} from "./communityDetailUtils";
+import CommunityCommentItem, {
+  PredictionBadge,
+  ProfileAvatar,
+  ReactionButtons,
+} from "./components/CommunityCommentItem";
+import CommunityDetailSkeleton from "./components/CommunityDetailSkeleton";
 import styles from "./CommunityDetailPage.module.css";
-
-const CATEGORY_LABELS = Object.fromEntries(
-  CATEGORIES.map((category) => [category.id, category.label]),
-);
-
-const CATEGORY_SPORT = {
-  free: "overall",
-  lck: "esports",
-  baseball: "baseball",
-  soccer: "soccer",
-};
-
-const PREDICTION_SPORTS = ["soccer", "baseball", "esports"];
-
-const EMPTY_REACTION = {
-  likeCount: 0,
-  dislikeCount: 0,
-  myReaction: null,
-};
-
-const updateReactionSummary = (summary, nextReaction) => {
-  const nextSummary = {
-    ...EMPTY_REACTION,
-    ...summary,
-  };
-
-  if (nextSummary.myReaction === "like") {
-    nextSummary.likeCount -= 1;
-  }
-
-  if (nextSummary.myReaction === "dislike") {
-    nextSummary.dislikeCount -= 1;
-  }
-
-  if (nextReaction === "like") {
-    nextSummary.likeCount += 1;
-  }
-
-  if (nextReaction === "dislike") {
-    nextSummary.dislikeCount += 1;
-  }
-
-  nextSummary.myReaction = nextReaction;
-
-  return nextSummary;
-};
-
-const PredictionBadge = ({
-  userId,
-  fallbackSport = "overall",
-  sportStats = [],
-}) => {
-  if (!userId) return null;
-
-  const userStats = sportStats.filter((item) => item.user_id === userId);
-
-  let totalCount;
-  let accuracyRate;
-
-  if (fallbackSport === "overall") {
-    const explicitOverallStats = userStats.find(
-      (item) => item.sport === "overall",
-    );
-
-    if (explicitOverallStats) {
-      totalCount = Number(explicitOverallStats.total_count ?? 0);
-      accuracyRate = Number(explicitOverallStats.accuracy_rate ?? 0);
-    } else {
-      const sportSummaries = userStats.filter((item) =>
-        PREDICTION_SPORTS.includes(item.sport),
-      );
-
-      totalCount = sportSummaries.reduce(
-        (sum, item) => sum + Number(item.total_count ?? 0),
-        0,
-      );
-
-      const correctCount = sportSummaries.reduce((sum, item) => {
-        if (item.correct_count !== null && item.correct_count !== undefined) {
-          return sum + Number(item.correct_count);
-        }
-
-        const itemTotalCount = Number(item.total_count ?? 0);
-        const itemAccuracyRate = Number(item.accuracy_rate ?? 0);
-
-        return sum + itemTotalCount * (itemAccuracyRate / 100);
-      }, 0);
-
-      accuracyRate =
-        totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-    }
-  } else {
-    const stats = userStats.find((item) => item.sport === fallbackSport);
-
-    totalCount = Number(stats?.total_count ?? 0);
-    accuracyRate = Number(stats?.accuracy_rate ?? 0);
-  }
-
-  const badge = getPredictionBadgeMeta(fallbackSport, totalCount, accuracyRate);
-
-  return <span className={styles.predictionBadge}>{badge.name}</span>;
-};
-
-const formatCommentTime = (date, updatedAt, currentTime) => {
-  const formatted = formatRelativeTime(updatedAt || date, currentTime);
-
-  return updatedAt && updatedAt !== date ? `${formatted} · 수정됨` : formatted;
-};
-
-const submitFormOnEnter = (event) => {
-  if (
-    event.key !== "Enter" ||
-    event.shiftKey ||
-    event.nativeEvent?.isComposing
-  ) {
-    return;
-  }
-
-  event.preventDefault();
-  event.currentTarget.form?.requestSubmit();
-};
-
-const normalizePost = (post) => ({
-  ...post,
-  author: post.author_name,
-  avatarUrl: post.author_avatar_url,
-  createdAt: post.created_at,
-  views: Number(post.view_count ?? 0),
-  images: getCommunityPostImages(post),
-});
-
-const normalizeComments = (rows) => {
-  const normalize = (row) => ({
-    id: row.id,
-    userId: row.user_id,
-    author: row.author_name,
-    avatarUrl: row.author_avatar_url,
-    content: row.content,
-    isDeleted: Boolean(row.is_deleted),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    replies: [],
-  });
-
-  const roots = rows.filter((row) => !row.parent_id).map(normalize);
-
-  const rootMap = new Map(roots.map((comment) => [comment.id, comment]));
-
-  rows
-    .filter((row) => row.parent_id)
-    .forEach((row) => {
-      rootMap.get(row.parent_id)?.replies.push(normalize(row));
-    });
-
-  return roots;
-};
-
-const ProfileAvatar = ({ avatarUrl, className, name }) => {
-  const profileName = String(name || "FanPick");
-
-  return avatarUrl ? (
-    <img className={className} src={avatarUrl} alt={`${profileName} 프로필`} />
-  ) : (
-    <span className={className} aria-hidden="true">
-      {profileName.trim().charAt(0).toUpperCase() || "F"}
-    </span>
-  );
-};
-
-const ReactionButtons = ({ disabled, onReact, summary = EMPTY_REACTION }) => (
-  <div className={styles.reactionButtons}>
-    <span className={styles.reactionOption}>
-      <button
-        type="button"
-        className={[
-          styles.supportButton,
-          summary.myReaction === "like" ? styles.activeReaction : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-pressed={summary.myReaction === "like"}
-        disabled={disabled}
-        onClick={() => onReact("like")}
-      >
-        <span>응원</span>
-        <FiThumbsUp aria-hidden="true" />
-      </button>
-
-      <b className={styles.reactionCount}>{summary.likeCount}</b>
-    </span>
-
-    <span className={styles.reactionOption}>
-      <button
-        type="button"
-        className={[
-          styles.opposeButton,
-          summary.myReaction === "dislike" ? styles.activeReaction : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-pressed={summary.myReaction === "dislike"}
-        disabled={disabled}
-        onClick={() => onReact("dislike")}
-      >
-        <span>반대</span>
-        <FiThumbsDown aria-hidden="true" />
-      </button>
-
-      <b className={styles.reactionCount}>{summary.dislikeCount}</b>
-    </span>
-  </div>
-);
-
-const CommunityDetailSkeleton = () => (
-  <section className={styles.page} aria-label="게시글 불러오는 중">
-    <div className={`container ${styles.layout}`}>
-      <CommunitySidebars isPopularLoading popularPosts={[]} />
-
-      <main className={styles.mainArea}>
-        <div className={styles.pageControls}>
-          <Skeleton.Box className={styles.skeletonControl} />
-
-          <div>
-            <Skeleton.Box className={styles.skeletonControl} />
-            <Skeleton.Box className={styles.skeletonControl} />
-          </div>
-        </div>
-
-        <article className={`${styles.article} ${styles.detailSkeleton}`}>
-          <div className={styles.articleHeader}>
-            <Skeleton.Line className={styles.skeletonCategory} />
-            <Skeleton.Line className={styles.skeletonTitle} />
-
-            <div className={styles.authorInfo}>
-              <Skeleton.Circle className={styles.skeletonAvatar} />
-
-              <div>
-                <Skeleton.Line className={styles.skeletonAuthor} />
-                <Skeleton.Line className={styles.skeletonMeta} />
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.articleContent}>
-            <div className={styles.skeletonContentLines}>
-              {["92%", "80%", "68%", "88%", "74%", "52%"].map((width) => (
-                <Skeleton.Line
-                  className={styles.skeletonContentLine}
-                  key={width}
-                  width={width}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.commentSection}>
-            <Skeleton.Line className={styles.skeletonCommentTitle} />
-
-            <Skeleton.Box className={styles.skeletonCommentBox} />
-
-            <div className={styles.skeletonCommentList}>
-              {Array.from({ length: 4 }, (_, index) => (
-                <div className={styles.skeletonCommentItem} key={index}>
-                  <Skeleton.Circle className={styles.skeletonSmallAvatar} />
-
-                  <div>
-                    <Skeleton.Line className={styles.skeletonAuthor} />
-                    <Skeleton.Line className={styles.skeletonCommentLine} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </article>
-      </main>
-    </div>
-  </section>
-);
 
 const CommunityDetailPage = () => {
   const { postId } = useParams();
@@ -337,6 +72,9 @@ const CommunityDetailPage = () => {
   const [editedContent, setEditedContent] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
+  const { dialogProps: noticeDialogProps, showDialog } = useFanPickDialog({
+    lockBodyScroll: false,
+  });
 
   const currentTime = useRelativeTimeClock();
   const increasedPostIdRef = useRef(null);
@@ -366,6 +104,7 @@ const CommunityDetailPage = () => {
 
     return new Date(a.createdAt) - new Date(b.createdAt);
   });
+  const commentCount = countComments(comments);
 
   const loadDetail = useCallback(
     async ({ showLoading = true } = {}) => {
@@ -492,6 +231,13 @@ const CommunityDetailPage = () => {
     return false;
   };
 
+  const showErrorDialog = (description) => {
+    showDialog({
+      description,
+      title: "요청 실패",
+    });
+  };
+
   const handlePostReaction = async (reaction) => {
     if (!requireLogin() || pendingReactionKey) return;
 
@@ -509,7 +255,7 @@ const CommunityDetailPage = () => {
       );
     } catch (error) {
       console.error("게시글 반응 저장 오류:", error);
-      alert("게시글 반응을 저장하지 못했습니다.");
+      showErrorDialog("게시글 반응을 저장하지 못했습니다.");
     } finally {
       setPendingReactionKey("");
     }
@@ -535,7 +281,7 @@ const CommunityDetailPage = () => {
       }));
     } catch (error) {
       console.error("댓글 반응 저장 오류:", error);
-      alert("댓글 반응을 저장하지 못했습니다.");
+      showErrorDialog("댓글 반응을 저장하지 못했습니다.");
     } finally {
       setPendingReactionKey("");
     }
@@ -547,66 +293,49 @@ const CommunityDetailPage = () => {
     if (!user || !comment.trim()) return;
 
     try {
-      const savedComment = await createCommunityComment({
+      await createCommunityComment({
         user,
         postId: Number(postId),
         content: comment.trim(),
       });
 
-      setComments((currentComments) => [
-        ...currentComments,
-        ...normalizeComments([savedComment]),
-      ]);
-
       setComment("");
+      await loadDetail({
+        showLoading: false,
+      });
     } catch (error) {
       console.error("댓글 저장 오류:", error);
-      alert("댓글을 저장하지 못했습니다.");
+      showErrorDialog("댓글을 저장하지 못했습니다.");
     }
   };
 
-  const submitReply = async (event, commentId) => {
+  const submitReply = async (event, parentComment) => {
     event.preventDefault();
 
     if (!user || !reply.trim()) return;
 
     try {
-      const savedReply = await createCommunityComment({
+      await createCommunityComment({
         user,
         postId: Number(postId),
-        parentId: commentId,
+        parentId: parentComment.id,
         content: reply.trim(),
       });
 
-      const normalizedReply = normalizeComments([
-        {
-          ...savedReply,
-          parent_id: null,
-        },
-      ])[0];
-
-      setComments((currentComments) =>
-        currentComments.map((item) =>
-          item.id === commentId
-            ? {
-                ...item,
-                replies: [...item.replies, normalizedReply],
-              }
-            : item,
-        ),
-      );
-
       setReply("");
       setReplyingTo(null);
+      await loadDetail({
+        showLoading: false,
+      });
     } catch (error) {
       console.error("답글 저장 오류:", error);
-      alert("답글을 저장하지 못했습니다.");
+      showErrorDialog("답글을 저장하지 못했습니다.");
     }
   };
 
-  const startEdit = (itemKey, content) => {
-    setEditingItem(itemKey);
-    setEditedContent(content);
+  const startEdit = (commentItem) => {
+    setEditingItem(`comment-${commentItem.id}`);
+    setEditedContent(commentItem.content);
   };
 
   const cancelEdit = () => {
@@ -620,71 +349,23 @@ const CommunityDetailPage = () => {
     try {
       await updateCommunityComment(commentId, editedContent.trim());
 
-      setComments((currentComments) =>
-        currentComments.map((item) =>
-          item.id === commentId
-            ? {
-                ...item,
-                content: editedContent.trim(),
-                updatedAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      );
-
+      await loadDetail({
+        showLoading: false,
+      });
       cancelEdit();
     } catch (error) {
       console.error("댓글 수정 오류:", error);
-      alert("댓글을 수정하지 못했습니다.");
+      showErrorDialog("댓글을 수정하지 못했습니다.");
     }
   };
 
-  const deleteComment = (commentId) => {
+  const deleteComment = (commentItem) => {
     setDeleteTarget({
       type: "comment",
-      commentId,
-      name: "댓글",
-    });
-  };
-
-  const saveReply = async (commentId, replyId) => {
-    if (!editedContent.trim()) return;
-
-    try {
-      await updateCommunityComment(replyId, editedContent.trim());
-
-      setComments((currentComments) =>
-        currentComments.map((item) =>
-          item.id === commentId
-            ? {
-                ...item,
-                replies: item.replies.map((replyItem) =>
-                  replyItem.id === replyId
-                    ? {
-                        ...replyItem,
-                        content: editedContent.trim(),
-                        updatedAt: new Date().toISOString(),
-                      }
-                    : replyItem,
-                ),
-              }
-            : item,
-        ),
-      );
-
-      cancelEdit();
-    } catch (error) {
-      console.error("답글 수정 오류:", error);
-      alert("답글을 수정하지 못했습니다.");
-    }
-  };
-
-  const deleteReply = (commentId, replyId) => {
-    setDeleteTarget({
-      type: "reply",
-      commentId,
-      replyId,
-      name: "답글",
+      commentId: commentItem.id,
+      hasReplies: (commentItem.replies ?? []).length > 0,
+      name: commentItem.parentId ? "답글" : "댓글",
+      parentId: commentItem.parentId,
     });
   };
 
@@ -710,44 +391,21 @@ const CommunityDetailPage = () => {
       }
 
       if (deleteTarget.type === "comment") {
-        await softDeleteCommunityComment(deleteTarget.commentId);
+        if (!deleteTarget.parentId || deleteTarget.hasReplies) {
+          await softDeleteCommunityComment(deleteTarget.commentId);
+        } else {
+          await deleteCommunityComment(deleteTarget.commentId);
+        }
 
-        setComments((currentComments) =>
-          currentComments.map((item) =>
-            item.id === deleteTarget.commentId
-              ? {
-                  ...item,
-                  author: "",
-                  avatarUrl: "",
-                  content: "",
-                  isDeleted: true,
-                }
-              : item,
-          ),
-        );
-      }
-
-      if (deleteTarget.type === "reply") {
-        await deleteCommunityComment(deleteTarget.replyId);
-
-        setComments((currentComments) =>
-          currentComments.map((item) =>
-            item.id === deleteTarget.commentId
-              ? {
-                  ...item,
-                  replies: item.replies.filter(
-                    (replyItem) => replyItem.id !== deleteTarget.replyId,
-                  ),
-                }
-              : item,
-          ),
-        );
+        await loadDetail({
+          showLoading: false,
+        });
       }
 
       setDeleteTarget(null);
     } catch (error) {
       console.error(`${deleteTarget.name} 삭제 오류:`, error);
-      alert(`${deleteTarget.name}을 삭제하지 못했습니다.`);
+      showErrorDialog(`${deleteTarget.name}을 삭제하지 못했습니다.`);
     }
   };
 
@@ -867,6 +525,7 @@ const CommunityDetailPage = () => {
                         src={image.url}
                         alt={`${post.title} 첨부 이미지 ${index + 1}`}
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   ))}
@@ -884,7 +543,7 @@ const CommunityDetailPage = () => {
 
             <section className={styles.commentSection}>
               <div className={styles.commentHeader}>
-                <h2>댓글 {comments.length}</h2>
+                <h2>댓글 {commentCount}</h2>
 
                 <div className={styles.commentSort}>
                   <button
@@ -936,261 +595,35 @@ const CommunityDetailPage = () => {
 
               <ul className={styles.commentList}>
                 {sortedComments.map((item) => (
-                  <li key={item.id}>
-                    {!item.isDeleted && (
-                      <ProfileAvatar
-                        avatarUrl={item.avatarUrl}
-                        className={styles.smallAvatar}
-                        name={item.author}
-                      />
-                    )}
-
-                    <div className={styles.commentBody}>
-                      {!item.isDeleted && (
-                        <span className={styles.nicknameWithBadge}>
-                          <b>{item.author}</b>
-
-                          <PredictionBadge
-                            userId={item.userId}
-                            fallbackSport={CATEGORY_SPORT[post.category]}
-                            sportStats={sportStats}
-                          />
-                        </span>
-                      )}
-
-                      {item.isDeleted ? (
-                        <p className={styles.deletedComment}>
-                          삭제된 댓글입니다.
-                        </p>
-                      ) : editingItem === `comment-${item.id}` ? (
-                        <div className={styles.editArea}>
-                          <textarea
-                            value={editedContent}
-                            onChange={(event) =>
-                              setEditedContent(event.target.value)
-                            }
-                            aria-label="댓글 수정 내용"
-                            autoFocus
-                          />
-
-                          <div>
-                            <button type="button" onClick={cancelEdit}>
-                              취소
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={!editedContent.trim()}
-                              onClick={() => saveComment(item.id)}
-                            >
-                              저장
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p>
-                          <LinkifiedText text={item.content} />
-                        </p>
-                      )}
-
-                      {!item.isDeleted && (
-                        <div className={styles.commentMeta}>
-                          <small>
-                            {formatCommentTime(
-                              item.createdAt,
-                              item.updatedAt,
-                              currentTime,
-                            )}
-                          </small>
-
-                          {user && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyingTo(
-                                  replyingTo === item.id ? null : item.id,
-                                );
-
-                                setReply("");
-                              }}
-                            >
-                              {replyingTo === item.id ? "취소" : "답글 쓰기"}
-                            </button>
-                          )}
-
-                          {item.userId === userId && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  startEdit(`comment-${item.id}`, item.content)
-                                }
-                              >
-                                수정
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => deleteComment(item.id)}
-                              >
-                                삭제
-                              </button>
-                            </>
-                          )}
-
-                          <ReactionButtons
-                            disabled={
-                              pendingReactionKey === `comment-${item.id}`
-                            }
-                            summary={
-                              commentReactions[item.id] ?? EMPTY_REACTION
-                            }
-                            onReact={(reaction) =>
-                              handleCommentReaction(item.id, reaction)
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {!item.isDeleted && replyingTo === item.id && (
-                        <form
-                          className={styles.replyForm}
-                          onSubmit={(event) => submitReply(event, item.id)}
-                        >
-                          <textarea
-                            value={reply}
-                            onChange={(event) => setReply(event.target.value)}
-                            onKeyDown={submitFormOnEnter}
-                            placeholder={`${item.author}님에게 답글 입력`}
-                            aria-label="답글 내용"
-                            autoFocus
-                          />
-
-                          <div className={styles.replyActions}>
-                            <button
-                              type="button"
-                              className={styles.replyCancelButton}
-                              onClick={() => {
-                                setReply("");
-                                setReplyingTo(null);
-                              }}
-                            >
-                              취소
-                            </button>
-
-                            <button type="submit" disabled={!reply.trim()}>
-                              등록
-                            </button>
-                          </div>
-                        </form>
-                      )}
-
-                      {(item.replies ?? []).map((replyItem) => (
-                        <div className={styles.replyItem} key={replyItem.id}>
-                          <ProfileAvatar
-                            avatarUrl={replyItem.avatarUrl}
-                            className={styles.smallAvatar}
-                            name={replyItem.author}
-                          />
-
-                          <div>
-                            <span className={styles.nicknameWithBadge}>
-                              <b>{replyItem.author}</b>
-
-                              <PredictionBadge
-                                userId={replyItem.userId}
-                                fallbackSport={CATEGORY_SPORT[post.category]}
-                                sportStats={sportStats}
-                              />
-                            </span>
-
-                            {editingItem ===
-                            `reply-${item.id}-${replyItem.id}` ? (
-                              <div className={styles.editArea}>
-                                <textarea
-                                  value={editedContent}
-                                  onChange={(event) =>
-                                    setEditedContent(event.target.value)
-                                  }
-                                  aria-label="답글 수정 내용"
-                                  autoFocus
-                                />
-
-                                <div>
-                                  <button type="button" onClick={cancelEdit}>
-                                    취소
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    disabled={!editedContent.trim()}
-                                    onClick={() =>
-                                      saveReply(item.id, replyItem.id)
-                                    }
-                                  >
-                                    저장
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <p>
-                                <LinkifiedText text={replyItem.content} />
-                              </p>
-                            )}
-
-                            <div className={styles.commentMeta}>
-                              <small>
-                                {formatCommentTime(
-                                  replyItem.createdAt,
-                                  replyItem.updatedAt,
-                                  currentTime,
-                                )}
-                              </small>
-
-                              {replyItem.userId === userId && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      startEdit(
-                                        `reply-${item.id}-${replyItem.id}`,
-                                        replyItem.content,
-                                      )
-                                    }
-                                  >
-                                    수정
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      deleteReply(item.id, replyItem.id)
-                                    }
-                                  >
-                                    삭제
-                                  </button>
-                                </>
-                              )}
-
-                              <ReactionButtons
-                                disabled={
-                                  pendingReactionKey ===
-                                  `comment-${replyItem.id}`
-                                }
-                                summary={
-                                  commentReactions[replyItem.id] ??
-                                  EMPTY_REACTION
-                                }
-                                onReact={(reaction) =>
-                                  handleCommentReaction(replyItem.id, reaction)
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </li>
+                  <CommunityCommentItem
+                    commentItem={item}
+                    commentReactions={commentReactions}
+                    currentTime={currentTime}
+                    editedContent={editedContent}
+                    editingItem={editingItem}
+                    key={item.id}
+                    onCancelEdit={cancelEdit}
+                    onChangeEditedContent={setEditedContent}
+                    onDelete={deleteComment}
+                    onReact={handleCommentReaction}
+                    onReplyChange={setReply}
+                    onReplySubmit={submitReply}
+                    onReplyToggle={(commentItem) => {
+                      setReplyingTo(
+                        replyingTo === commentItem.id ? null : commentItem.id,
+                      );
+                      setReply("");
+                    }}
+                    onSaveEdit={saveComment}
+                    onStartEdit={startEdit}
+                    pendingReactionKey={pendingReactionKey}
+                    postCategory={post.category}
+                    reply={reply}
+                    replyingTo={replyingTo}
+                    sportStats={sportStats}
+                    user={user}
+                    userId={userId}
+                  />
                 ))}
               </ul>
             </section>
@@ -1227,6 +660,8 @@ const CommunityDetailPage = () => {
         }}
         lockBodyScroll={false}
       />
+
+      <FanPickDialog {...noticeDialogProps} />
     </section>
   );
 };

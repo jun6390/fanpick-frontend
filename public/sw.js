@@ -4,8 +4,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title ?? "FanPick 경기 알림", {
       body: payload.body ?? "설정한 경기가 곧 시작해요!",
-      icon: "/fanpick_mascot.svg",
-      badge: "/fanpick_mascot.svg",
+      icon: "/fanpick_mascot-192.png",
+      badge: "/fanpick_mascot-192.png",
       tag: payload.tag ?? `fanpick-match-${payload.matchId ?? "alert"}`,
       data: {
         url: payload.url ?? "/calendar",
