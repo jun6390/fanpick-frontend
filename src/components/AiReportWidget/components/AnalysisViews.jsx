@@ -110,7 +110,14 @@ const AnimatedBotMessage = ({ label, text, onComplete }) => {
   return (
     <div className={styles.botMessage}>
       <span className={styles.messageAvatar} aria-hidden="true">
-        <img src="/fanpick_mascot.svg" alt="" />
+        <img
+          src="/fanpick_mascot.webp"
+          alt=""
+          width="144"
+          height="144"
+          loading="lazy"
+          decoding="async"
+        />
       </span>
 
       <div className={`${styles.messageBubble} ${styles.aiTextBubble}`}>
@@ -215,7 +222,14 @@ export const AnalysisConversation = ({
       <div className={styles.chatMessages}>
         <div className={styles.botMessage}>
           <span className={styles.messageAvatar} aria-hidden="true">
-            <img src="/fanpick_mascot.svg" alt="" />
+            <img
+              src="/fanpick_mascot.webp"
+              alt=""
+              width="144"
+              height="144"
+              loading="lazy"
+              decoding="async"
+            />
           </span>
 
           <div className={styles.messageBubble}>

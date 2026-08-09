@@ -85,6 +85,7 @@ const LogoImage = ({ src, name, shortName, className = "" }) => {
       src={src}
       alt={`${name} 로고`}
       loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

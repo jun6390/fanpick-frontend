@@ -104,18 +104,6 @@ const uploadCommunityPostImages = async ({ userId, files = [] }) => {
   return uploadedImages;
 };
 
-export const deleteCommunityPostImage = async (imagePath) => {
-  if (!imagePath) return;
-
-  const { error } = await supabase.storage
-    .from(COMMUNITY_IMAGE_BUCKET)
-    .remove([imagePath]);
-
-  if (error) {
-    throw error;
-  }
-};
-
 const deleteCommunityPostImages = async (imagePaths = []) => {
   const uniqueImagePaths = [...new Set(imagePaths.filter(Boolean))];
 
@@ -280,6 +268,232 @@ const toggleReaction = async ({
   if (upsertError) throw upsertError;
 
   return reaction;
+};
+
+const isBoardCategory = (category) =>
+  category && !["all", "my-comments", "my-posts"].includes(category);
+
+const COMMUNITY_SORT_KEYS = new Set(["latest", "popular", "support"]);
+
+const normalizeCommunitySortKey = (sortBy) =>
+  COMMUNITY_SORT_KEYS.has(sortBy) ? sortBy : "latest";
+
+const createCommunityPostsPageQuery = ({
+  category,
+  searchKeyword,
+  sortBy,
+  userId,
+}) => {
+  let query = supabase
+    .from("community_posts")
+    .select("*", { count: "exact" });
+  const keyword = searchKeyword?.trim();
+
+  if (category === "my-posts" && userId) {
+    query = query.eq("user_id", userId);
+  } else if (isBoardCategory(category)) {
+    query = query.eq("category", category);
+  }
+
+  if (keyword) {
+    const keywordPattern = `%${keyword.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+
+    query = query.or(
+      `title.ilike.${keywordPattern},author_name.ilike.${keywordPattern}`,
+    );
+  }
+
+  if (sortBy === "popular") {
+    return query.order("view_count", { ascending: false }).order("created_at", {
+      ascending: false,
+    });
+  }
+
+  return query.order("created_at", { ascending: false });
+};
+
+const fetchCommunityPostsByIds = async (postIds = []) => {
+  const uniquePostIds = [
+    ...new Set(postIds.map(Number).filter(Number.isFinite)),
+  ];
+
+  if (uniquePostIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .in("id", uniquePostIds);
+
+  if (error) throw error;
+
+  const postsById = new Map((data ?? []).map((post) => [Number(post.id), post]));
+
+  return uniquePostIds.map((postId) => postsById.get(postId)).filter(Boolean);
+};
+
+const attachPostCounts = async (posts = []) => {
+  const postIds = posts.map((post) => post.id).filter(Boolean);
+
+  if (postIds.length === 0) return posts;
+
+  const [
+    { data: comments, error: commentsError },
+    { data: reactions, error: reactionsError },
+  ] = await Promise.all([
+    supabase.from("community_comments").select("post_id").in("post_id", postIds),
+    supabase
+      .from("community_post_reactions")
+      .select("post_id, reaction")
+      .in("post_id", postIds)
+      .eq("reaction", "like"),
+  ]);
+
+  if (commentsError) throw commentsError;
+  if (reactionsError) throw reactionsError;
+
+  const commentCounts = (comments ?? []).reduce((counts, comment) => {
+    counts[comment.post_id] = (counts[comment.post_id] ?? 0) + 1;
+
+    return counts;
+  }, {});
+
+  const supportCounts = (reactions ?? []).reduce((counts, reaction) => {
+    counts[reaction.post_id] = (counts[reaction.post_id] ?? 0) + 1;
+
+    return counts;
+  }, {});
+
+  return posts.map((post) => ({
+    ...post,
+    commentCount: commentCounts[post.id] ?? 0,
+    supportCount: supportCounts[post.id] ?? 0,
+  }));
+};
+
+const attachPostPageCounts = (posts = [], pageRows = []) => {
+  const countsByPostId = new Map(
+    pageRows.map((row) => [
+      Number(row.post_id),
+      {
+        commentCount: Number(row.comment_count ?? 0),
+        supportCount: Number(row.support_count ?? 0),
+      },
+    ]),
+  );
+
+  return posts.map((post) => {
+    const counts = countsByPostId.get(Number(post.id));
+
+    return {
+      ...post,
+      commentCount: counts?.commentCount ?? 0,
+      supportCount: counts?.supportCount ?? 0,
+    };
+  });
+};
+
+const fetchCommunityPostsPageFallback = async ({
+  category,
+  from,
+  searchKeyword,
+  sortBy,
+  to,
+  userId,
+}) => {
+  const { data, error, count } = await createCommunityPostsPageQuery({
+    category,
+    searchKeyword,
+    sortBy,
+    userId,
+  }).range(from, to);
+
+  if (error) throw error;
+
+  let posts = await attachPostCounts(data ?? []);
+
+  if (sortBy === "support") {
+    posts = posts.sort((a, b) => {
+      if ((b.supportCount ?? 0) !== (a.supportCount ?? 0)) {
+        return (b.supportCount ?? 0) - (a.supportCount ?? 0);
+      }
+
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  }
+
+  return {
+    posts: await attachLatestProfiles(posts),
+    totalCount: count ?? 0,
+  };
+};
+
+export const fetchCommunityPostsPage = async ({
+  category = "all",
+  page = 1,
+  pageSize = 10,
+  searchKeyword = "",
+  sortBy = "latest",
+  userId = "",
+} = {}) => {
+  if (category === "my-posts" && !userId) {
+    return {
+      posts: [],
+      totalCount: 0,
+    };
+  }
+
+  const safePage = Math.max(1, Number(page) || 1);
+  const safePageSize = Math.max(1, Number(pageSize) || 10);
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
+  const sortKey = normalizeCommunitySortKey(sortBy);
+  const { data: pageRows, error } = await supabase.rpc(
+    "get_community_post_page",
+    {
+      page_limit: safePageSize,
+      page_offset: from,
+      search_keyword: searchKeyword,
+      sort_key: sortKey,
+      target_category: category,
+      target_user_id: userId || null,
+    },
+  );
+
+  if (error) {
+    console.error("커뮤니티 페이지 RPC 조회 오류:", error);
+
+    return fetchCommunityPostsPageFallback({
+      category,
+      from,
+      searchKeyword,
+      sortBy: sortKey,
+      to,
+      userId,
+    });
+  }
+
+  const posts = await fetchCommunityPostsByIds(
+    (pageRows ?? []).map((row) => row.post_id),
+  );
+  const postsWithCounts = attachPostPageCounts(posts, pageRows ?? []);
+
+  return {
+    posts: await attachLatestProfiles(postsWithCounts),
+    totalCount: Number(pageRows?.[0]?.total_count ?? 0),
+  };
+};
+
+export const fetchPopularCommunityPosts = async (limit = 10) => {
+  const { data, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .order("view_count", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(0, Math.max(0, limit - 1));
+
+  if (error) throw error;
+
+  return attachLatestProfiles(await attachPostCounts(data ?? []));
 };
 
 export const fetchCommunityPosts = async () => {

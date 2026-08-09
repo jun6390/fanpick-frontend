@@ -1,32 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import MatchFilter from "../../components/MatchFilter/MatchFilter";
 import SearchInput from "../../components/SearchInput/SearchInput";
 import SubNav from "../../components/SubNav/SubNav";
 import { TEAMS_SUB_NAV_ITEMS } from "../../constants/teamsNav";
-import {
-  fetchPlayerRecords,
-  fetchTeamRecords,
-  subscribeTeamRecords,
-} from "../../services/teamRecords";
 import PillTabs from "./components/PillTabs/PillTabs";
 import RecordTable from "./components/RecordTable/RecordTable";
 import TeamRecordImage from "./components/TeamRecordImage";
-import { LOL_PLAYER_RECORDS } from "./data/lolPlayerRecordData";
-import { LOL_TEAM_RECORDS } from "./data/lolTeamRecordData";
-import {
-  BASEBALL_HITTER_RECORDS,
-  BASEBALL_HITTER_RECORDS_EXTRA,
-  BASEBALL_PITCHER_RECORDS,
-  BASEBALL_PITCHER_RECORDS_EXTRA,
-  BASEBALL_TEAM_RECORDS,
-  BASEBALL_TEAM_RECORDS_EXTRA,
-} from "./data/kboRecordData";
-import {
-  SOCCER_PLAYER_RECORDS_K1,
-  SOCCER_PLAYER_RECORDS_K2,
-  SOCCER_TEAM_RECORDS_K1,
-  SOCCER_TEAM_RECORDS_K2,
-} from "./data/kleagueRecordData";
+import useTeamRecordData from "./hooks/useTeamRecordData";
 import {
   formatDecimal,
   formatPercent,
@@ -58,7 +38,6 @@ const SOCCER_LEAGUE_TABS = [
   { id: "k2", label: "K LEAGUE 2" },
 ];
 
-const LCK_TEAM_IDS = new Set(LOL_TEAM_RECORDS.map((team) => team.teamId));
 const BASEBALL_KEY_PLAYER_LIMIT_BY_KIND = 20;
 const SOCCER_KEY_PLAYER_LIMIT = 30;
 
@@ -96,18 +75,23 @@ const collectTeamTabs = (rows = []) => {
   return tabs;
 };
 
-const buildEsportsPlayerRows = (rows = []) =>
-  rows
-    .filter((row) => LCK_TEAM_IDS.has(row.teamId))
-    .map((row) => ({ ...row }));
+const buildEsportsPlayerRows = (rows = [], teamRows = []) => {
+  const teamIds = new Set(teamRows.map((team) => team.teamId));
+
+  return rows.filter((row) => teamIds.has(row.teamId)).map((row) => ({ ...row }));
+};
 
 const getEsportsPlayerDisplayName = (row) => row.playerFullName || row.playerName;
 
-const buildBaseballPlayerRows = () =>
-  [...BASEBALL_HITTER_RECORDS, ...BASEBALL_PITCHER_RECORDS].map((row, index) => ({
+const buildBaseballPlayerRows = (recordData) =>
+  [
+    ...recordData.BASEBALL_HITTER_RECORDS,
+    ...recordData.BASEBALL_PITCHER_RECORDS,
+  ].map((row, index) => ({
     ...row,
     rank: index + 1,
-    kind: index < BASEBALL_HITTER_RECORDS.length ? "HITTER" : "PITCHER",
+    kind:
+      index < recordData.BASEBALL_HITTER_RECORDS.length ? "HITTER" : "PITCHER",
   }));
 
 const sortByRank = (rows = []) =>
@@ -149,16 +133,26 @@ const limitBaseballKeyPlayers = (rows = []) => {
 const limitSoccerKeyPlayers = (rows = []) =>
   sortByRank(rows).slice(0, SOCCER_KEY_PLAYER_LIMIT);
 
-const buildSoccerTeamRows = (leagueKey) =>
-  (leagueKey === "k2" ? SOCCER_TEAM_RECORDS_K2 : SOCCER_TEAM_RECORDS_K1).map((row, index) => ({
+const buildSoccerTeamRows = (leagueKey, recordData) =>
+  (
+    leagueKey === "k2"
+      ? recordData.SOCCER_TEAM_RECORDS_K2
+      : recordData.SOCCER_TEAM_RECORDS_K1
+  ).map((row, index) => ({
     ...row,
     rank: row.rank ?? row.ranking ?? index + 1,
     logoUrl: getSoccerTeamLogoUrl(row),
   }));
 
-const buildSoccerPlayerRows = (leagueKey) =>
-  uniqueBy(leagueKey === "k2" ? SOCCER_PLAYER_RECORDS_K2 : SOCCER_PLAYER_RECORDS_K1, (row) =>
-    row.playerId ? `${row.teamId}:${row.playerId}` : `${row.teamId}:${row.playerName}`,
+const buildSoccerPlayerRows = (leagueKey, recordData) =>
+  uniqueBy(
+    leagueKey === "k2"
+      ? recordData.SOCCER_PLAYER_RECORDS_K2
+      : recordData.SOCCER_PLAYER_RECORDS_K1,
+    (row) =>
+      row.playerId
+        ? `${row.teamId}:${row.playerId}`
+        : `${row.teamId}:${row.playerName}`,
   ).map((row, index) => {
     const officialImageUrl = getSoccerPlayerOfficialImageUrl(row);
 
@@ -195,12 +189,7 @@ const createSoccerPlayerFallbackImageMap = (rows = []) => {
   return imageMap;
 };
 
-const SOCCER_PLAYER_FALLBACK_IMAGE_MAP = createSoccerPlayerFallbackImageMap([
-  ...SOCCER_PLAYER_RECORDS_K1,
-  ...SOCCER_PLAYER_RECORDS_K2,
-]);
-
-const getSoccerPlayerFallbackImageUrl = (row) => {
+const getSoccerPlayerFallbackImageUrl = (row, fallbackImageMap) => {
   const keys = [
     row.playerId ? `${row.teamId}:${row.playerId}` : "",
     row.playerId ? `${row.teamCode}:${row.playerId}` : "",
@@ -212,13 +201,16 @@ const getSoccerPlayerFallbackImageUrl = (row) => {
     row.playerName ? normalizeText(row.playerName) : "",
   ].filter(Boolean);
 
-  return keys.map((key) => SOCCER_PLAYER_FALLBACK_IMAGE_MAP.get(key)).find(Boolean);
+  return keys.map((key) => fallbackImageMap.get(key)).find(Boolean);
 };
 
-const mergeSoccerPlayerFallbackImages = (rows = []) =>
+const mergeSoccerPlayerFallbackImages = (rows = [], fallbackImageMap) =>
   rows.map((row) => {
     const officialImageUrl = getSoccerPlayerOfficialImageUrl(row);
-    const fallbackImageUrl = getSoccerPlayerFallbackImageUrl(row);
+    const fallbackImageUrl = getSoccerPlayerFallbackImageUrl(
+      row,
+      fallbackImageMap,
+    );
 
     return {
       ...row,
@@ -462,46 +454,21 @@ const TeamRecordPage = () => {
   const [activeView, setActiveView] = useState("team");
   const [activeSoccerLeague, setActiveSoccerLeague] = useState("k1");
   const [activeTeam, setActiveTeam] = useState("all");
-  const [remoteRowsByKey, setRemoteRowsByKey] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const activeLeagueId = getRecordLeagueId(activeSport, activeSoccerLeague);
   const recordDatasetKey = getRecordDatasetKey(activeSport, activeView, activeLeagueId);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchRemoteRows = async () => {
-      try {
-        const fetchRecords = activeView === "team" ? fetchTeamRecords : fetchPlayerRecords;
-        const rows = await fetchRecords({
-          leagueId: activeLeagueId,
-          sportId: activeSport,
-        });
-
-        if (!isMounted) {
-          return;
-        }
-
-        setRemoteRowsByKey((currentRowsByKey) => ({
-          ...currentRowsByKey,
-          [recordDatasetKey]: rows,
-        }));
-      } catch (error) {
-        console.warn("레코드 조회 중 Supabase 요청이 실패했습니다.", error);
-      }
-    };
-
-    fetchRemoteRows();
-    const unsubscribe = subscribeTeamRecords(fetchRemoteRows);
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [activeLeagueId, activeSport, activeView, recordDatasetKey]);
+  const { activeRecordData, remoteRows } = useTeamRecordData({
+    activeLeagueId,
+    activeSport,
+    activeView,
+    recordDatasetKey,
+  });
 
   const baseRows = useMemo(() => {
-    const remoteRows = remoteRowsByKey[recordDatasetKey];
+    const soccerPlayerFallbackImageMap = createSoccerPlayerFallbackImageMap([
+      ...activeRecordData.SOCCER_PLAYER_RECORDS_K1,
+      ...activeRecordData.SOCCER_PLAYER_RECORDS_K2,
+    ]);
 
     if (Array.isArray(remoteRows) && remoteRows.length > 0) {
       if (activeSport === "soccer" && activeView === "team") {
@@ -512,7 +479,12 @@ const TeamRecordPage = () => {
       }
 
       if (activeSport === "soccer" && activeView === "player") {
-        return limitSoccerKeyPlayers(mergeSoccerPlayerFallbackImages(remoteRows));
+        return limitSoccerKeyPlayers(
+          mergeSoccerPlayerFallbackImages(
+            remoteRows,
+            soccerPlayerFallbackImageMap,
+          ),
+        );
       }
 
       if (activeSport === "baseball" && activeView === "player") {
@@ -523,35 +495,55 @@ const TeamRecordPage = () => {
     }
 
     if (activeSport === "esports") {
-      return activeView === "team" ? LOL_TEAM_RECORDS : buildEsportsPlayerRows(LOL_PLAYER_RECORDS);
+      return activeView === "team"
+        ? activeRecordData.LOL_TEAM_RECORDS
+        : buildEsportsPlayerRows(
+            activeRecordData.LOL_PLAYER_RECORDS,
+            activeRecordData.LOL_TEAM_RECORDS,
+          );
     }
 
     if (activeSport === "baseball") {
       if (activeView === "team") {
-        return [...BASEBALL_TEAM_RECORDS, ...BASEBALL_TEAM_RECORDS_EXTRA];
+        return [
+          ...activeRecordData.BASEBALL_TEAM_RECORDS,
+          ...activeRecordData.BASEBALL_TEAM_RECORDS_EXTRA,
+        ];
       }
 
       return limitBaseballKeyPlayers([
-        ...buildBaseballPlayerRows(),
-        ...BASEBALL_HITTER_RECORDS_EXTRA.map((row, index) => ({
+        ...buildBaseballPlayerRows(activeRecordData),
+        ...activeRecordData.BASEBALL_HITTER_RECORDS_EXTRA.map((row, index) => ({
           ...row,
-          rank: BASEBALL_HITTER_RECORDS.length + index + 1,
+          rank: activeRecordData.BASEBALL_HITTER_RECORDS.length + index + 1,
           kind: "HITTER",
         })),
-        ...BASEBALL_PITCHER_RECORDS_EXTRA.map((row, index) => ({
+        ...activeRecordData.BASEBALL_PITCHER_RECORDS_EXTRA.map((row, index) => ({
           ...row,
-          rank: BASEBALL_HITTER_RECORDS.length + BASEBALL_HITTER_RECORDS_EXTRA.length + index + 1,
+          rank:
+            activeRecordData.BASEBALL_HITTER_RECORDS.length +
+            activeRecordData.BASEBALL_HITTER_RECORDS_EXTRA.length +
+            index +
+            1,
           kind: "PITCHER",
         })),
       ]);
     }
 
     if (activeView === "team") {
-      return buildSoccerTeamRows(activeSoccerLeague);
+      return buildSoccerTeamRows(activeSoccerLeague, activeRecordData);
     }
 
-    return limitSoccerKeyPlayers(buildSoccerPlayerRows(activeSoccerLeague));
-  }, [activeSport, activeView, activeSoccerLeague, recordDatasetKey, remoteRowsByKey]);
+    return limitSoccerKeyPlayers(
+      buildSoccerPlayerRows(activeSoccerLeague, activeRecordData),
+    );
+  }, [
+    activeRecordData,
+    activeSoccerLeague,
+    activeSport,
+    activeView,
+    remoteRows,
+  ]);
 
   const teamTabs = useMemo(
     () => (activeView === "player" ? collectTeamTabs(baseRows) : []),
@@ -725,6 +717,7 @@ const TeamRecordPage = () => {
               rows={visibleRows}
               getRowKey={(row) => getRecordRowKey(row, activeSport, activeView)}
               ariaLabel={`${activeSport} ${activeView} record table`}
+              virtualized
             />
           </section>
         </div>

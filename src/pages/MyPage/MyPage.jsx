@@ -40,6 +40,11 @@ import {
 } from "./myPageUtils.js";
 import styles from "./MyPage.module.css";
 
+const getPredictionMatchIds = (predictionRows = []) =>
+  predictionRows
+    .map((prediction) => prediction.match_id ?? prediction.matches?.id)
+    .filter(Boolean);
+
 const MyPage = () => {
   const navigate = useNavigate();
 
@@ -102,19 +107,20 @@ const MyPage = () => {
         };
         let nextPredictionError = "";
 
-        const [nextFavoriteTeamIds, nextPredictionRecords, nextPredictionStats] =
-          await Promise.all([
-            fetchFavoriteTeamIds(user.id),
-            fetchMyPredictions(user.id).catch((error) => {
-              console.error("예측 기록 조회 오류:", error);
-              nextPredictionError = "승부예측 정보를 불러오지 못했습니다.";
-              return [];
-            }),
-            fetchMatchPredictionStats().catch((error) => {
-              console.error("예측률 조회 오류:", error);
-              return [];
-            }),
-          ]);
+        const [nextFavoriteTeamIds, nextPredictionRecords] = await Promise.all([
+          fetchFavoriteTeamIds(user.id),
+          fetchMyPredictions(user.id).catch((error) => {
+            console.error("예측 기록 조회 오류:", error);
+            nextPredictionError = "승부예측 정보를 불러오지 못했습니다.";
+            return [];
+          }),
+        ]);
+        const nextPredictionStats = await fetchMatchPredictionStats(
+          getPredictionMatchIds(nextPredictionRecords),
+        ).catch((error) => {
+          console.error("예측률 조회 오류:", error);
+          return [];
+        });
 
         if (!isMounted) {
           return;
@@ -213,10 +219,10 @@ const MyPage = () => {
 
     const refreshPredictionData = async () => {
       try {
-        const [nextPredictionRecords, nextPredictionStats] = await Promise.all([
-          fetchMyPredictions(userInfo.id),
-          fetchMatchPredictionStats(),
-        ]);
+        const nextPredictionRecords = await fetchMyPredictions(userInfo.id);
+        const nextPredictionStats = await fetchMatchPredictionStats(
+          getPredictionMatchIds(nextPredictionRecords),
+        );
 
         if (!isMounted) {
           return;
@@ -636,6 +642,8 @@ const MyPage = () => {
                     src={userInfo.avatarUrl}
                     alt={`${userInfo.nickname} 프로필`}
                     className={styles.profileAvatarImage}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <span aria-hidden="true">{profileInitial}</span>

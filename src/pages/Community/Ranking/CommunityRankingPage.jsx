@@ -80,7 +80,11 @@ const getInitial = (name) => name.trim().charAt(0).toUpperCase() || "F";
 
 const RankingAvatar = ({ name, src }) => (
   <span className={styles.avatar} aria-hidden="true">
-    {src ? <img src={src} alt="" /> : getInitial(name)}
+    {src ? (
+      <img src={src} alt="" loading="lazy" decoding="async" />
+    ) : (
+      getInitial(name)
+    )}
   </span>
 );
 

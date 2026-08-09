@@ -35,6 +35,8 @@ const TeamLogo = ({ src, name, shortName }) => {
       className={styles.teamLogo}
       src={src}
       alt={`${name} 로고`}
+      loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

@@ -31,4 +31,7 @@ dist-ssr
 # Generated local data
 public/data/
 supabase/.temp/
+docs/README.portfolio.md
+playwright-report/
+test-results/
 

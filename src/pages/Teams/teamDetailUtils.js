@@ -1,8 +1,14 @@
 import { getTeamInfo } from "../../constants/teamInfo.js";
+import {
+  DAY_LABELS_KO as DAY_LABELS,
+  formatDateKey,
+  formatMonthDay,
+  parseDateKey,
+} from "../../utils/date.js";
 import { normalizeMatchTimingStatus } from "../../utils/matchStatus.js";
 import { FEATURED_TEAMS } from "./data/teams.js";
 
-const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+export { formatDateKey };
 
 export const UPCOMING_MATCH_LIMIT = 6;
 export const FINISHED_MATCH_LIMIT = 6;
@@ -41,40 +47,6 @@ const STANDING_SOURCE_LABELS = {
   PANDASCORE_STANDINGS: "PandaScore 순위",
   PANDASCORE_TOURNAMENT_MATCHES: "PandaScore 현재 대회",
 };
-const KLEAGUE_LOGO_URL = "https://www.kleague.com/assets/images/emblem";
-const STANDING_TEAM_LOGOS_BY_CODE = {
-  K01: `${KLEAGUE_LOGO_URL}/emblem_K01.png`,
-  K03: `${KLEAGUE_LOGO_URL}/emblem_K03.png`,
-  K04: `${KLEAGUE_LOGO_URL}/emblem_K04.png`,
-  K05: `${KLEAGUE_LOGO_URL}/emblem_K05.png`,
-  K09: `${KLEAGUE_LOGO_URL}/emblem_K09.png`,
-  K10: `${KLEAGUE_LOGO_URL}/emblem_K10.png`,
-  K17: `${KLEAGUE_LOGO_URL}/emblem_K17.png`,
-  K18: `${KLEAGUE_LOGO_URL}/emblem_K18.png`,
-  K21: `${KLEAGUE_LOGO_URL}/emblem_K21.png`,
-  K22: `${KLEAGUE_LOGO_URL}/emblem_K22.png`,
-  K26: `${KLEAGUE_LOGO_URL}/emblem_K26.png`,
-  K27: `${KLEAGUE_LOGO_URL}/emblem_K27.png`,
-  K29: `${KLEAGUE_LOGO_URL}/emblem_K29.png`,
-  K35: `${KLEAGUE_LOGO_URL}/emblem_K35.png`,
-};
-
-const padNumber = (number) => String(number).padStart(2, "0");
-
-export const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
-
-const parseDateKey = (dateKey) => {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  return new Date(year, month - 1, day, 12);
-};
-
 export const getAverageRating = (ratings) => {
   if (!ratings.length) {
     return 0;
@@ -86,6 +58,20 @@ export const getAverageRating = (ratings) => {
 };
 
 const normalizeTeamCode = (teamCode) => teamCode?.trim().toUpperCase() || "";
+
+const getStandingSport = (leagueId) => {
+  const normalizedLeagueId = String(leagueId ?? "").toLowerCase();
+
+  if (normalizedLeagueId.includes("lck")) {
+    return "esports";
+  }
+
+  if (normalizedLeagueId.includes("kbo")) {
+    return "baseball";
+  }
+
+  return "soccer";
+};
 
 export const getStandingSourceLabel = (source) =>
   STANDING_SOURCE_LABELS[source] ?? source ?? "공식 순위";
@@ -149,6 +135,7 @@ const getStandingWins = ({ draws, games, losses, wins }) => {
 const createOfficialStandingTeam = (standing) => {
   const teamCode = normalizeTeamCode(standing.team_code);
   const leagueId = standing.league_id;
+  const officialTeam = getTeamInfo(teamCode, getStandingSport(leagueId));
   const matchedTeam = FEATURED_TEAMS.find(
     (featuredTeam) =>
       featuredTeam.league === leagueId &&
@@ -159,9 +146,9 @@ const createOfficialStandingTeam = (standing) => {
   return (
     matchedTeam ?? {
       id: standing.team_id || `standing-${standing.league_id}-${teamCode}`,
-      logo: STANDING_TEAM_LOGOS_BY_CODE[teamCode] ?? "",
-      name: standing.team_name,
-      shortName: teamCode,
+      logo: officialTeam.logo ?? "",
+      name: standing.team_name || officialTeam.name,
+      shortName: officialTeam.shortName || teamCode,
     }
   );
 };
@@ -304,9 +291,7 @@ export const normalizeMatch = (match) => {
     id: match.external_id ?? `match-${match.id}`,
     databaseId: match.id,
     dateKey: match.match_date,
-    date: `${padNumber(matchDate.getMonth() + 1)}.${padNumber(
-      matchDate.getDate(),
-    )}`,
+    date: formatMonthDay(matchDate),
     day: DAY_LABELS[matchDate.getDay()],
     time,
     sport: match.sport,

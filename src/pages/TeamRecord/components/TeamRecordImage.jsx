@@ -32,6 +32,8 @@ const TeamRecordImage = ({
       src={imageSrc}
       alt={alt}
       aria-hidden="true"
+      loading="lazy"
+      decoding="async"
       onError={() => {
         setFailedSources((currentFailedSources) => {
           if (currentFailedSources.has(imageSrc)) {

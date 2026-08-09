@@ -1,30 +1,7 @@
 import { useEffect, useRef } from "react";
 import { FiCalendar, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { formatDateKey, formatDateRange } from "../../utils/date";
 import styles from "./WeekDateSelector.module.css";
-
-const padNumber = (number) => String(number).padStart(2, "0");
-
-const formatDateKey = (date) =>
-  [
-    date.getFullYear(),
-    padNumber(date.getMonth() + 1),
-    padNumber(date.getDate()),
-  ].join("-");
-
-const formatDateRange = (dates) => {
-  if (dates.length === 0) {
-    return "";
-  }
-
-  const formatDate = (date) =>
-    [
-      date.getFullYear(),
-      padNumber(date.getMonth() + 1),
-      padNumber(date.getDate()),
-    ].join(".");
-
-  return `${formatDate(dates[0])} - ${formatDate(dates[dates.length - 1])}`;
-};
 
 const WeekDateSelector = ({
   className = "",

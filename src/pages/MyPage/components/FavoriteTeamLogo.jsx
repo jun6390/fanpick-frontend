@@ -18,6 +18,7 @@ const FavoriteTeamLogo = ({ team }) => {
       src={team.logo}
       alt={`${team.name} 로고`}
       loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

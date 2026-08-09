@@ -71,7 +71,13 @@ export const ProfileAvatar = ({ avatarUrl, className, name }) => {
   const profileName = String(name || "FanPick");
 
   return avatarUrl ? (
-    <img className={className} src={avatarUrl} alt={`${profileName} 프로필`} />
+    <img
+      className={className}
+      src={avatarUrl}
+      alt={`${profileName} 프로필`}
+      loading="lazy"
+      decoding="async"
+    />
   ) : (
     <span className={className} aria-hidden="true">
       {profileName.trim().charAt(0).toUpperCase() || "F"}

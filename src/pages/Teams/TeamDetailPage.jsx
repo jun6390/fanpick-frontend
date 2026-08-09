@@ -313,7 +313,9 @@ const TeamDetailPage = () => {
         );
 
         const [predictionStats, myPredictions] = await Promise.all([
-          fetchMatchPredictionStats(),
+          fetchMatchPredictionStats(
+            nextTeamMatches.map((match) => match.databaseId),
+          ),
           userId
             ? fetchMyPredictionSelections(
                 userId,

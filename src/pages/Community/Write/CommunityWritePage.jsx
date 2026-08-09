@@ -459,6 +459,8 @@ const CommunityWritePage = () => {
                         className={styles.imagePreview}
                         src={image.url}
                         alt={`게시글 첨부 이미지 미리보기 ${index + 1}`}
+                        loading="lazy"
+                        decoding="async"
                       />
 
                       <button

@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ci": "playwright test",
     "preview": "vite preview",
     "sync:kbo": "node --env-file=.env.sync scripts/sync-kbo-schedule.mjs",
     "sync:kbo:records": "node --env-file=.env.sync scripts/sync-kbo-records.mjs",
@@ -21,10 +24,12 @@
     "sync:records": "npm run sync:standings && npm run sync:kbo:records && npm run sync:kleague:records && npm run sync:lck:records",
     "sync:schedules": "npm run sync:kbo && npm run sync:kleague && npm run sync:lck",
     "sync:results": "npm run sync:schedules && npm run sync:prediction-results",
-    "sync:standings": "npm run sync:kbo:standings && npm run sync:kleague:standings && npm run sync:lck:standings"
+    "sync:standings": "npm run sync:kbo:standings && npm run sync:kleague:standings && npm run sync:lck:standings",
+    "reports:regenerate": "node --env-file=.env.sync scripts/regenerate-all-match-ai-reports.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
+    "@tanstack/react-query": "^5.101.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.7.0",
@@ -32,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
