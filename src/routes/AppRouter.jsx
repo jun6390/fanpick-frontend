@@ -1,9 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import MainLayout from "../layouts/MainLayout/MainLayout";
 
 import ProtectedRoute from "./ProtectedRoute";
-import RouteFallback from "./RouteFallback";
 import ScrollToTop from "./ScrollToTop";
 
 const HomePage = lazy(() => import("../pages/Home/HomePage"));
@@ -49,59 +48,51 @@ const AppRouter = () => {
     <BrowserRouter>
       <ScrollToTop />
 
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route element={<MainLayout />}>
-            {/* 누구나 접근 가능 */}
-            <Route path="/" element={<HomePage />} />
+      <Routes>
+        <Route element={<MainLayout />}>
+          {/* 누구나 접근 가능 */}
+          <Route path="/" element={<HomePage />} />
 
-            <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/teams/:teamId" element={<TeamDetailPage />} />
-            <Route path="/team-record" element={<TeamRecordPage />} />
-            <Route path="/matches" element={<MatchSchedulePage />} />
-            <Route path="/prediction" element={<PredictionPage />} />
-            <Route path="/community" element={<CommunityPage />} />
-            <Route
-              path="/community/ranking"
-              element={<CommunityRankingPage />}
-            />
-            <Route
-              path="/community/standings"
-              element={<CommunitySportsPage view="standings" />}
-            />
-            <Route
-              path="/community/results"
-              element={<CommunitySportsPage view="results" />}
-            />
-            <Route
-              path="/community/prediction-results"
-              element={<CommunitySportsPage view="prediction-results" />}
-            />
-            <Route path="/community/write" element={<CommunityWritePage />} />
-            <Route
-              path="/community/:postId/edit"
-              element={<CommunityWritePage />}
-            />
-            <Route path="/community/:postId" element={<CommunityDetailPage />} />
+          <Route path="/teams" element={<TeamsPage />} />
+          <Route path="/teams/:teamId" element={<TeamDetailPage />} />
+          <Route path="/team-record" element={<TeamRecordPage />} />
+          <Route path="/matches" element={<MatchSchedulePage />} />
+          <Route path="/prediction" element={<PredictionPage />} />
+          <Route path="/community" element={<CommunityPage />} />
+          <Route path="/community/ranking" element={<CommunityRankingPage />} />
+          <Route
+            path="/community/standings"
+            element={<CommunitySportsPage view="standings" />}
+          />
+          <Route
+            path="/community/results"
+            element={<CommunitySportsPage view="results" />}
+          />
+          <Route
+            path="/community/prediction-results"
+            element={<CommunitySportsPage view="prediction-results" />}
+          />
+          <Route path="/community/write" element={<CommunityWritePage />} />
+          <Route path="/community/:postId/edit" element={<CommunityWritePage />} />
+          <Route path="/community/:postId" element={<CommunityDetailPage />} />
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/find-password" element={<FindPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/find-password" element={<FindPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-            {/* 로그인 사용자만 접근 가능 */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/worldcup" element={<WorldCupPage />} />
-              <Route path="/worldcup/:id" element={<WorldCupPlayPage />} />
-              <Route path="/mypage" element={<MyPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-            </Route>
-
-            {/* 존재하지 않는 경로 */}
-            <Route path="*" element={<NotFoundPage />} />
+          {/* 로그인 사용자만 접근 가능 */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/worldcup" element={<WorldCupPage />} />
+            <Route path="/worldcup/:id" element={<WorldCupPlayPage />} />
+            <Route path="/mypage" element={<MyPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
           </Route>
-        </Routes>
-      </Suspense>
+
+          {/* 존재하지 않는 경로 */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
     </BrowserRouter>
   );
 };
