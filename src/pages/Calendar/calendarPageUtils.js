@@ -1,4 +1,5 @@
 import { TEAM_BY_ID } from "../Teams/data/teams";
+export { formatDateKey, getMonthRange } from "../../utils/date";
 
 export const SPORT_FILTERS = [
   { id: "my", label: "MY" },
@@ -15,26 +16,6 @@ export const CALENDAR_SKELETON_DAYS = Array.from(
 export const SUPPORTED_SPORTS = new Set(["baseball", "soccer", "lol"]);
 
 const EXCLUDED_BASEBALL_TEAM_CODES = new Set(["NANUM", "DREAM"]);
-
-export const getMonthRange = (date) => {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const fromDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month + 1, 0);
-  const toDate = `${lastDay.getFullYear()}-${String(
-    lastDay.getMonth() + 1,
-  ).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
-
-  return { fromDate, toDate };
-};
-
-export const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
 
 export const formatSelectedDateLabel = (dateKey) => {
   const [year, month, day] = String(dateKey ?? "").split("-");

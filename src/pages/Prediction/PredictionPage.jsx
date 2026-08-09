@@ -319,10 +319,10 @@ const PredictionPage = () => {
         const startDate = formatDateKey(weekStart);
         const endDate = formatDateKey(addDays(weekStart, 6));
 
-        const [supabaseMatches, predictionStats] = await Promise.all([
-          fetchPredictionMatches(startDate, endDate),
-          fetchMatchPredictionStats(),
-        ]);
+        const supabaseMatches = await fetchPredictionMatches(startDate, endDate);
+        const predictionStats = await fetchMatchPredictionStats(
+          supabaseMatches.map((match) => match.databaseId),
+        );
 
         if (!isMounted) return;
 
@@ -398,12 +398,16 @@ const PredictionPage = () => {
 
       const refreshPredictionStats = async () => {
         try {
-          const latestStats = await fetchMatchPredictionStats();
+          const latestStats = await fetchMatchPredictionStats([match.databaseId]);
           setMatches((previous) =>
-            applyPredictionStatsToMatches(previous, latestStats, {
-              awayRateKey: "awayRate",
-              homeRateKey: "homeRate",
-            }),
+            previous.map((previousMatch) =>
+              String(previousMatch.databaseId) === String(match.databaseId)
+                ? applyPredictionStatsToMatches([previousMatch], latestStats, {
+                    awayRateKey: "awayRate",
+                    homeRateKey: "homeRate",
+                  })[0]
+                : previousMatch,
+            ),
           );
         } catch (statsError) {
           console.error("경기 투표 통계 조회 오류:", statsError);

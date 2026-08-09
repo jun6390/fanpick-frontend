@@ -525,6 +525,7 @@ const CommunityDetailPage = () => {
                         src={image.url}
                         alt={`${post.title} 첨부 이미지 ${index + 1}`}
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   ))}

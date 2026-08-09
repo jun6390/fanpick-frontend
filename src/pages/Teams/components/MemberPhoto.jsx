@@ -16,6 +16,7 @@ const MemberPhoto = ({ member }) => {
       src={activePhoto}
       alt={`${member.name} 프로필 이미지`}
       loading="lazy"
+      decoding="async"
       onError={handlePhotoError}
     />
   );

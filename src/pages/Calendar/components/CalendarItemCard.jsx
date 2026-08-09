@@ -13,6 +13,8 @@ const TeamBadge = ({ team }) => {
       className={css.teamLogo}
       src={team.logo}
       alt={team.name}
+      loading="lazy"
+      decoding="async"
       onError={(event) => {
         event.currentTarget.style.display = "none";
         setHasError(true);

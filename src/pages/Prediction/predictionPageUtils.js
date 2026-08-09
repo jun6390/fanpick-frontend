@@ -2,12 +2,21 @@ import { getTeamInfo as getSharedTeamInfo } from "../../constants/teamInfo";
 import { supabase } from "../../lib/supabase";
 import { hasResolvedPredictionScore } from "../../services/predictionApi";
 import {
+  DAY_LABELS_KO,
+  addDays,
+  createToday,
+  formatDateKey,
+  getMonday,
+  parseDateKey,
+} from "../../utils/date";
+import {
   normalizeMatchTimingStatus,
   parseMatchScore,
 } from "../../utils/matchStatus";
 import { createMatchBeginAt } from "../../utils/predictionDeadline";
 
-export const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+export const DAY_LABELS = DAY_LABELS_KO;
+export { addDays, createToday, formatDateKey, getMonday, parseDateKey };
 
 export const FILTERS = [
   { id: "all", label: "ALL" },
@@ -19,44 +28,6 @@ export const FILTERS = [
 export const PREDICTION_SPORTS = FILTERS.filter(
   (filter) => filter.id !== "all",
 ).map((filter) => filter.id);
-
-const padNumber = (number) => String(number).padStart(2, "0");
-
-export const createToday = () => {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  return today;
-};
-
-export const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
-
-export const parseDateKey = (dateKey) => {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  return new Date(year, month - 1, day, 12);
-};
-
-export const addDays = (date, amount) => {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + amount);
-  return nextDate;
-};
-
-export const getMonday = (date) => {
-  const currentDate = new Date(date);
-  const currentDay = currentDate.getDay();
-  const difference = currentDay === 0 ? -6 : 1 - currentDay;
-
-  currentDate.setDate(currentDate.getDate() + difference);
-  currentDate.setHours(12, 0, 0, 0);
-  return currentDate;
-};
 
 const getPredictionTeamInfo = (teamCode, sport) => {
   const code = String(teamCode ?? "").trim().toUpperCase();

@@ -126,6 +126,7 @@ const TeamLogo = ({ team }) => {
           src={team.logo}
           alt=""
           loading="lazy"
+          decoding="async"
           onError={() => setHasError(true)}
         />
       ) : (

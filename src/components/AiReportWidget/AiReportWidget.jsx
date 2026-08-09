@@ -247,7 +247,14 @@ const AiReportWidget = () => {
             !hasReports && (
             <div className={styles.emptyState}>
               <div className={styles.logoBox}>
-                <img src="/fanpick_mascot.svg" alt="" />
+                <img
+                  src="/fanpick_mascot.webp"
+                  alt=""
+                  width="144"
+                  height="144"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
 
               <strong>등록된 경기 정보가 없습니다</strong>
@@ -409,8 +416,11 @@ const AiReportWidget = () => {
             <span className={styles.logoFrame} aria-hidden="true">
               <img
                 className={styles.buttonLogo}
-                src="/fanpick_mascot.svg"
+                src="/fanpick_mascot.webp"
                 alt=""
+                width="144"
+                height="144"
+                decoding="async"
               />
             </span>
 

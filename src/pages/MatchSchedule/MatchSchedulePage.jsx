@@ -8,6 +8,7 @@ import SearchInput from "../../components/SearchInput/SearchInput";
 import SubNav from "../../components/SubNav/SubNav";
 import WeekDateSelector from "../../components/WeekDateSelector/WeekDateSelector";
 import { MATCH_CENTER_SUB_NAV_ITEMS } from "../../constants/matchCenterNav";
+import { getTeamInfo } from "../../constants/teamInfo";
 import useAuth from "../../contexts/useAuth";
 import { supabase } from "../../lib/supabase";
 import { subscribeToMatchChanges } from "../../services/matchRealtime";
@@ -17,6 +18,15 @@ import {
   fetchMyPredictionSelections,
   markPredictedMatches,
 } from "../../services/predictionApi";
+import {
+  DAY_LABELS_KO as DAY_LABELS,
+  addDays,
+  createToday,
+  formatDateKey,
+  formatMonthDay,
+  getMonday,
+  parseDateKey,
+} from "../../utils/date";
 import { normalizeMatchTimingStatus } from "../../utils/matchStatus";
 import styles from "./MatchSchedulePage.module.css";
 
@@ -31,268 +41,10 @@ const SUPPORTED_SPORT_IDS = new Set(
   FILTERS.filter((filter) => filter.id !== "all").map((filter) => filter.id),
 );
 
-const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
 const SPORT_LABELS = {
   baseball: "BASEBALL",
   soccer: "SOCCER",
   esports: "LOL",
-};
-
-const KLEAGUE_LOGO_URL = "https://www.kleague.com/assets/images/emblem";
-
-const TEAM_INFO = {
-  // KBO
-  DOOSAN: {
-    name: "두산 베어스",
-    shortName: "DOOSAN",
-    logo: "/logos/doosan.png",
-  },
-  NC: {
-    name: "NC 다이노스",
-    shortName: "NC",
-    logo: "/logos/nc.png",
-  },
-  LG: {
-    name: "LG 트윈스",
-    shortName: "LG",
-    logo: "/logos/lg.png",
-  },
-  KIA: {
-    name: "KIA 타이거즈",
-    shortName: "KIA",
-    logo: "/logos/kia.png",
-  },
-  SAMSUNG: {
-    name: "삼성 라이온즈",
-    shortName: "SAMSUNG",
-    logo: "/logos/samsung.png",
-  },
-  LOTTE: {
-    name: "롯데 자이언츠",
-    shortName: "LOTTE",
-    logo: "/logos/lotte.png",
-  },
-  HANWHA: {
-    name: "한화 이글스",
-    shortName: "HANWHA",
-    logo: "/logos/hanwha.png",
-  },
-  SSG: {
-    name: "SSG 랜더스",
-    shortName: "SSG",
-    logo: "/logos/ssg.png",
-  },
-  KIWOOM: {
-    name: "키움 히어로즈",
-    shortName: "KIWOOM",
-    logo: "/logos/kiwoom.png",
-  },
-  KT: {
-    name: "KT 위즈",
-    shortName: "KT",
-    logo: "/logos/kt.png",
-  },
-
-  // K리그
-  K01: {
-    name: "울산 HD FC",
-    shortName: "울산",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K01.png`,
-  },
-  K02: {
-    name: "수원 삼성 블루윙즈",
-    shortName: "수원",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K02.png`,
-  },
-  K03: {
-    name: "포항 스틸러스",
-    shortName: "포항",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K03.png`,
-  },
-  K04: {
-    name: "제주SK FC",
-    shortName: "제주",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K04.png`,
-  },
-  K05: {
-    name: "전북 현대 모터스",
-    shortName: "전북",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K05.png`,
-  },
-  K06: {
-    name: "부산 아이파크",
-    shortName: "부산",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K06.png`,
-  },
-  K07: {
-    name: "전남 드래곤즈",
-    shortName: "전남",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K07.png`,
-  },
-  K08: {
-    name: "성남 FC",
-    shortName: "성남",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K08.png`,
-  },
-  K09: {
-    name: "FC 서울",
-    shortName: "서울",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K09.png`,
-  },
-  K10: {
-    name: "대전 하나시티즌",
-    shortName: "대전",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K10.png`,
-  },
-  K17: {
-    name: "대구 FC",
-    shortName: "대구",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K17.png`,
-  },
-  K18: {
-    name: "인천 유나이티드",
-    shortName: "인천",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K18.png`,
-  },
-  K20: {
-    name: "경남 FC",
-    shortName: "경남",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K20.png`,
-  },
-  K21: {
-    name: "강원 FC",
-    shortName: "강원",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K21.png`,
-  },
-  K22: {
-    name: "광주 FC",
-    shortName: "광주",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K22.png`,
-  },
-  K26: {
-    name: "부천 FC 1995",
-    shortName: "부천",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K26.png`,
-  },
-  K27: {
-    name: "FC 안양",
-    shortName: "안양",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K27.png`,
-  },
-  K29: {
-    name: "수원 FC",
-    shortName: "수원FC",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K29.png`,
-  },
-  K31: {
-    name: "서울 이랜드 FC",
-    shortName: "서울E",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K31.png`,
-  },
-  K32: {
-    name: "안산 그리너스 FC",
-    shortName: "안산",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K32.png`,
-  },
-  K34: {
-    name: "충남아산 FC",
-    shortName: "충남아산",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K34.png`,
-  },
-  K35: {
-    name: "김천 상무",
-    shortName: "김천",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K35.png`,
-  },
-  K36: {
-    name: "김포 FC",
-    shortName: "김포",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K36.png`,
-  },
-  K37: {
-    name: "충북청주 FC",
-    shortName: "충북청주",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K37.png`,
-  },
-  K38: {
-    name: "천안 시티 FC",
-    shortName: "천안",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K38.png`,
-  },
-  K39: {
-    name: "화성 FC",
-    shortName: "화성",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K39.png`,
-  },
-  K40: {
-    name: "파주프런티어FC",
-    shortName: "파주",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K40.png`,
-  },
-  K41: {
-    name: "김해FC2008",
-    shortName: "김해",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K41.png`,
-  },
-  K42: {
-    name: "용인FC",
-    shortName: "용인",
-    logo: `${KLEAGUE_LOGO_URL}/emblem_K42.png`,
-  },
-};
-
-const LCK_TEAM_INFO = {
-  T1: {
-    name: "T1",
-    shortName: "T1",
-    logo: "https://cdn-api.pandascore.co/images/team/image/126061/t_oscq04.png",
-  },
-  GEN: {
-    name: "Gen.G",
-    shortName: "GEN",
-    logo: "https://cdn-api.pandascore.co/images/team/image/2882/699px_gen.g_esports_2026_allmode.png",
-  },
-  HLE: {
-    name: "한화생명 e스포츠",
-    shortName: "HLE",
-    logo: "https://cdn-api.pandascore.co/images/team/image/2883/hanwha-life-esports-1s04vbu0.png",
-  },
-  DK: {
-    name: "Dplus KIA",
-    shortName: "DK",
-    logo: "https://cdn-api.pandascore.co/images/team/image/132531/800px_dplus_lightmode.png",
-  },
-  KT: {
-    name: "KT Rolster",
-    shortName: "KT",
-    logo: "https://cdn-api.pandascore.co/images/team/image/63/kt_rolsterlogo_profile.png",
-  },
-  KRX: {
-    name: "Kiwoom DRX",
-    shortName: "KRX",
-    logo: "https://cdn-api.pandascore.co/images/team/image/126370/220px_dr_xlogo_square.png",
-  },
-  NS: {
-    name: "농심 레드포스",
-    shortName: "NS",
-    logo: "https://cdn-api.pandascore.co/images/team/image/128217/nongshim_red_forcelogo_square.png",
-  },
-  BFX: {
-    name: "BNK FEARX",
-    shortName: "BFX",
-    logo: "https://cdn-api.pandascore.co/images/team/image/134115/663px_fear_x_icon_lightmode.png",
-  },
-  DNS: {
-    name: "DN SOOPers",
-    shortName: "DNS",
-    logo: "https://cdn-api.pandascore.co/images/team/image/136063/dn_soo_perslogo_profile.png",
-  },
-  BRO: {
-    name: "HANJIN BRION",
-    shortName: "BRO",
-    logo: "https://cdn-api.pandascore.co/images/team/image/128218/628px_brion_2023_lightmode.png",
-  },
 };
 
 const STADIUM_NAMES = {
@@ -306,66 +58,6 @@ const STADIUM_NAMES = {
   GWANGJU: "광주-기아 챔피언스 필드",
   MUNHAK: "인천 SSG 랜더스필드",
   INCHEON: "인천 SSG 랜더스필드",
-};
-
-const padNumber = (number) => String(number).padStart(2, "0");
-
-const createToday = () => {
-  const today = new Date();
-
-  today.setHours(12, 0, 0, 0);
-
-  return today;
-};
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
-
-const parseDateKey = (dateKey) => {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  return new Date(year, month - 1, day, 12);
-};
-
-const addDays = (date, amount) => {
-  const nextDate = new Date(date);
-
-  nextDate.setDate(nextDate.getDate() + amount);
-
-  return nextDate;
-};
-
-const getMonday = (date) => {
-  const currentDate = new Date(date);
-  const currentDay = currentDate.getDay();
-  const difference = currentDay === 0 ? -6 : 1 - currentDay;
-
-  currentDate.setDate(currentDate.getDate() + difference);
-  currentDate.setHours(12, 0, 0, 0);
-
-  return currentDate;
-};
-
-const getTeamInfo = (teamCode, sport) => {
-  const normalizedCode = teamCode?.trim().toUpperCase();
-
-  const teamInfo =
-    sport === "esports"
-      ? LCK_TEAM_INFO[normalizedCode]
-      : TEAM_INFO[normalizedCode];
-
-  return (
-    teamInfo ?? {
-      name: teamCode || "미정",
-      shortName: teamCode || "-",
-      logo: "",
-    }
-  );
 };
 
 const getStadiumName = (stadium) => {
@@ -398,9 +90,7 @@ const normalizeSupabaseMatch = (match) => {
 
     league: match.league,
 
-    date: `${padNumber(matchDate.getMonth() + 1)}.${padNumber(
-      matchDate.getDate(),
-    )}`,
+    date: formatMonthDay(matchDate),
 
     day: DAY_LABELS[matchDate.getDay()],
     time,
@@ -515,7 +205,9 @@ const MatchSchedulePage = () => {
           .map(normalizeSupabaseMatch);
 
         const [predictionStats, myPredictions] = await Promise.all([
-          fetchMatchPredictionStats(),
+          fetchMatchPredictionStats(
+            normalizedMatches.map((match) => match.databaseId),
+          ),
           userId
             ? fetchMyPredictionSelections(
                 userId,

@@ -8,6 +8,8 @@ const TeamMark = ({ team }) =>
       className={styles.teamLogo}
       src={team.logo}
       alt={`${team.name} 로고`}
+      loading="lazy"
+      decoding="async"
     />
   ) : (
     <span className={styles.teamMark} aria-hidden="true">

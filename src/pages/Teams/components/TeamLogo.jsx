@@ -18,6 +18,7 @@ const TeamLogo = ({ team, className = "" }) => {
       src={team.logo}
       alt={`${team.name} 로고`}
       loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );
@@ -40,6 +41,7 @@ export const TeamBadgeLogo = ({ team }) => {
       src={team.logo}
       alt={`${team.name} 로고`}
       loading="lazy"
+      decoding="async"
       onError={() => setHasError(true)}
     />
   );

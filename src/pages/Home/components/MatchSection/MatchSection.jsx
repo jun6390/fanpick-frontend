@@ -15,6 +15,14 @@ import {
   markPredictedMatches,
 } from "../../../../services/predictionApi";
 import { subscribeToMatchChanges } from "../../../../services/matchRealtime";
+import {
+  DAY_LABELS_KO as DAY_LABELS,
+  createToday,
+  formatDateKey,
+  formatDotDate,
+  formatMonthDay,
+  parseDateKey,
+} from "../../../../utils/date";
 import { normalizeMatchTimingStatus } from "../../../../utils/matchStatus";
 import styles from "./MatchSection.module.css";
 
@@ -30,8 +38,6 @@ const SPORT_LABELS = {
   soccer: "SOCCER",
   esports: "LOL",
 };
-
-const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 const STADIUM_NAMES = {
   JAMSIL: "잠실 야구장",
@@ -51,38 +57,6 @@ const HOME_MATCH_STATUS_PRIORITY = {
   live: 0,
   scheduled: 1,
   finished: 3,
-};
-
-const padNumber = (number) => String(number).padStart(2, "0");
-
-const createToday = () => {
-  const today = new Date();
-
-  today.setHours(12, 0, 0, 0);
-
-  return today;
-};
-
-const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = padNumber(date.getMonth() + 1);
-  const day = padNumber(date.getDate());
-
-  return `${year}-${month}-${day}`;
-};
-
-const parseDateKey = (dateKey) => {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  return new Date(year, month - 1, day, 12);
-};
-
-const formatDateLabel = (date) => {
-  return [
-    date.getFullYear(),
-    padNumber(date.getMonth() + 1),
-    padNumber(date.getDate()),
-  ].join(".");
 };
 
 const getStadiumName = (stadium) => {
@@ -112,9 +86,7 @@ const normalizeSupabaseMatch = (match) => {
 
     league: match.league,
 
-    date: `${padNumber(matchDate.getMonth() + 1)}.${padNumber(
-      matchDate.getDate(),
-    )}`,
+    date: formatMonthDay(matchDate),
 
     day: DAY_LABELS[matchDate.getDay()],
     time,
@@ -192,7 +164,7 @@ const MatchSection = () => {
     return {
       date: today,
       dateKey: formatDateKey(today),
-      label: formatDateLabel(today),
+      label: formatDotDate(today),
     };
   }, []);
 
@@ -254,7 +226,9 @@ const MatchSection = () => {
           .map(normalizeSupabaseMatch);
 
         const [predictionStats, myPredictions] = await Promise.all([
-          fetchMatchPredictionStats(),
+          fetchMatchPredictionStats(
+            normalizedMatches.map((match) => match.databaseId),
+          ),
           userId
             ? fetchMyPredictionSelections(
                 userId,

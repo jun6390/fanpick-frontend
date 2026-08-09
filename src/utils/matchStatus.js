@@ -1,3 +1,5 @@
+import { padNumber } from "./date.js";
+
 export const CLOSED_MATCH_STATUSES = new Set(["cancelled", "postponed"]);
 export const FINISHED_MATCH_STATUSES = new Set([
   "complete",
@@ -42,8 +44,6 @@ export const isLiveMatchStatus = (status) =>
 
 export const isResultPendingMatchStatus = (status) =>
   normalizeStatus(status) === RESULT_PENDING_MATCH_STATUS;
-
-const padNumber = (number) => String(number).padStart(2, "0");
 
 const normalizeMatchTime = (timeValue) => {
   const [hourText, minuteText] = String(timeValue ?? DEFAULT_MATCH_TIME)
