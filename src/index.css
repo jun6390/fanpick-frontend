@@ -14,7 +14,7 @@
   font-family: var(--font-korean);
 
   color: var(--color-text-primary);
-  background-color: var(--color-background);
+  background-color: var(--color-surface-dark);
 
   --font-size-section-title: clamp(38px, 4vw, 54px);
 
@@ -165,6 +165,8 @@
 }
 
 html {
+  min-height: 100%;
+  background-color: var(--color-surface-dark);
   scroll-behavior: smooth;
   scrollbar-color: var(--color-scrollbar-thumb) transparent;
   scrollbar-width: thin;
@@ -174,7 +176,13 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background-color: var(--color-surface-dark);
   overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: var(--color-surface-dark);
 }
 
 * {

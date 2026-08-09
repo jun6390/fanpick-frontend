@@ -1,11 +1,11 @@
 import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import MainLayout from "../layouts/MainLayout/MainLayout";
+import HomePage from "../pages/Home/HomePage";
 
 import ProtectedRoute from "./ProtectedRoute";
 import ScrollToTop from "./ScrollToTop";
 
-const HomePage = lazy(() => import("../pages/Home/HomePage"));
 const TeamRecordPage = lazy(() => import("../pages/TeamRecord/TeamRecordPage"));
 const TeamsPage = lazy(() => import("../pages/Teams/TeamsPage"));
 const TeamDetailPage = lazy(() => import("../pages/Teams/TeamDetailPage"));
