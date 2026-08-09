@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import FanPickDialog from "../../components/FanPickDialog/FanPickDialog.jsx";
 import AiReportWidget from "../../components/AiReportWidget/AiReportWidget.jsx";
 import TopButton from "../../components/TopButton/TopButton.jsx";
 import Footer from "../Footer/Footer.jsx";
 import Header from "../Header/Header.jsx";
+import RouteFallback from "../../routes/RouteFallback.jsx";
 import styles from "./MainLayout.module.css";
 
 const DIALOG_CONTENT = {
@@ -51,7 +53,9 @@ const MainLayout = () => {
       <main
         className={`${styles.content} ${isHomePage ? styles.homeContent : ""}`}
       >
-        <Outlet />
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <Footer />
