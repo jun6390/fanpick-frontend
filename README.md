@@ -345,7 +345,7 @@ FanPick은 프론트엔드를 **Vercel**, 백엔드와 데이터베이스를 **S
 GitHub Actions는 KBO, K리그, LCK 경기 일정과 기록 데이터를 동기화하고, AI 리포트와 알림 기능은 Supabase Edge Function을 통해 관리합니다.
 
 <div align="center">
-  <img src="./FanPick-SystemArchitecture.png" width="900" alt="FanPick System Architecture"/>
+  <img src="./docs/FanPick-SystemArchitecture.png" width="900" alt="FanPick System Architecture"/>
 </div>
 
 ---
@@ -360,7 +360,7 @@ FanPick의 메인 화면은 스포츠 경기 정보를 빠르게 탐색할 수 �
 각 섹션은 경기 정보와 팀 로고를 중심으로 구성하여 스포츠 팬이 원하는 정보를 직관적으로 확인할 수 있도록 했습니다.
 
 <div align="center">
-  <img src="./FanPick-Main.png" width="900" alt="FanPick Main Page"/>
+  <img src="./docs/FanPick-Main.png" width="900" alt="FanPick Main Page"/>
 </div>
 
 <br />
