@@ -1,6 +1,6 @@
-# FanPick
+[![CI/CD](https://github.com/ureca-space/fanpick-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/ureca-space/fanpick-frontend/actions/workflows/ci.yml)
 
-스포츠 경기 일정 및 승부예측 커뮤니티 웹 서비스
+# FanPick [스포츠 경기 일정 및 승부예측 커뮤니티 플랫폼]
 
 ---
 
